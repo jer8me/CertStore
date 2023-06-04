@@ -3,7 +3,7 @@ CertStore project
 
 ## Setup ##
 
-1. Install an install of MariaDB.
+1. Install MariaDB (https://mariadb.org/download/).
 2. Run the DB creation script: sql/dbcreate.sql
 
 ## Build ##
