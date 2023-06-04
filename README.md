@@ -15,5 +15,6 @@ go build
 ## Run ##
 
 ```bash
-.\CertStore test
+export DB_PASSWORD=<your_db_password>
+.\CertStore test --dbpass $DB_PASSWORD
 ```
