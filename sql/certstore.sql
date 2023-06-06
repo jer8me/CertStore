@@ -269,3 +269,34 @@ VALUES
   (8, 'KeyUsageEncipherOnly'),
   (9, 'KeyUsageDecipherOnly')
 ;
+
+
+-- -----------------------------------------------------
+-- Populate SubjectAlternateNameType
+-- See https://www.rfc-editor.org/rfc/rfc5280.html#section-4.2.1.6
+-- -----------------------------------------------------
+INSERT INTO SubjectAlternateNameType (id, name)
+VALUES
+    (1, 'Other'),
+    (2, 'EmailAddress'),
+    (3, 'DNSName'),
+    (4, 'X400Address'),
+    (5, 'DirectoryName'),
+    (6, 'EDIPartyName'),
+    (7, 'URI'),
+    (8, 'IPAddress'),
+    (9, 'RegisteredID')
+;
+
+
+-- -----------------------------------------------------
+-- Populate PrivateKeyType
+-- -----------------------------------------------------
+INSERT INTO PrivateKeyType (id, type)
+VALUES
+    (1, 'Unknown'),
+    (2, 'RSA'),
+    (3, 'ECDSA'),
+    (4, 'Ed25519'),
+    (5, 'ECDH')
+;
