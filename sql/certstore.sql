@@ -25,7 +25,7 @@ DROP TABLE IF EXISTS PublicKeyAlgorithm;
 
 CREATE TABLE IF NOT EXISTS PublicKeyAlgorithm (
   id INT NOT NULL,
-  name VARCHAR(16) NOT NULL,
+  name VARCHAR(32) NOT NULL,
   PRIMARY KEY (id ASC),
   UNIQUE (name ASC)
 );
@@ -113,17 +113,6 @@ CREATE TABLE IF NOT EXISTS Certificate (
 DROP TABLE IF EXISTS PKIXName;
 
 CREATE TABLE IF NOT EXISTS PKIXName (
-  id INT NOT NULL,
-  PRIMARY KEY (id ASC)
-);
-
-
--- -----------------------------------------------------
--- Table Issuer
--- -----------------------------------------------------
-DROP TABLE IF EXISTS Issuer;
-
-CREATE TABLE IF NOT EXISTS Issuer (
   id INT NOT NULL,
   PRIMARY KEY (id ASC)
 );
@@ -226,3 +215,57 @@ CREATE TABLE IF NOT EXISTS CertificateSAN (
     REFERENCES SubjectAlternateName (id)
 );
 
+
+-- -----------------------------------------------------
+-- Populate SignatureAlgorithm
+-- -----------------------------------------------------
+INSERT INTO SignatureAlgorithm (id, name)
+VALUES
+  (1, 'UnknownSignatureAlgorithm'),
+  (2, 'MD2WithRSA'),
+  (3, 'MD5WithRSA'),
+  (4, 'SHA1WithRSA'),
+  (5, 'SHA256WithRSA'),
+  (6, 'SHA384WithRSA'),
+  (7, 'SHA512WithRSA'),
+  (8, 'DSAWithSHA1'),
+  (9, 'DSAWithSHA256'),
+  (10, 'ECDSAWithSHA1'),
+  (11, 'ECDSAWithSHA256'),
+  (12, 'ECDSAWithSHA384'),
+  (13, 'ECDSAWithSHA512'),
+  (14, 'SHA256WithRSAPSS'),
+  (15, 'SHA384WithRSAPSS'),
+  (16, 'SHA512WithRSAPSS'),
+  (17, 'PureEd25519')
+;
+
+
+-- -----------------------------------------------------
+-- Populate PublicKeyAlgorithm
+-- -----------------------------------------------------
+INSERT INTO PublicKeyAlgorithm (id, name)
+VALUES
+  (1, 'UnknownPublicKeyAlgorithm'),
+  (2, 'RSA'),
+  (3, 'DSA'),
+  (4, 'ECDSA'),
+  (5, 'Ed25519')
+;
+
+
+-- -----------------------------------------------------
+-- Populate KeyUsage
+-- -----------------------------------------------------
+INSERT INTO KeyUsage (id, name)
+VALUES
+  (1, 'KeyUsageDigitalSignature'),
+  (2, 'KeyUsageContentCommitment'),
+  (3, 'KeyUsageKeyEncipherment'),
+  (4, 'KeyUsageDataEncipherment'),
+  (5, 'KeyUsageKeyAgreement'),
+  (6, 'KeyUsageCertSign'),
+  (7, 'KeyUsageCRLSign'),
+  (8, 'KeyUsageEncipherOnly'),
+  (9, 'KeyUsageDecipherOnly')
+;
