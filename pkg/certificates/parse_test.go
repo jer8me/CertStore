@@ -80,7 +80,7 @@ func TestParsePEMFile(t *testing.T) {
 				t.Errorf("ParsePEMFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.Equal(t, tt.want.PublicKeyType, PublicKeyType(got), "invalid public key type")
+			assert.Equal(t, tt.want.PublicKeyType, got.PublicKeyAlgorithm.String(), "invalid public key type")
 			assert.Equal(t, tt.want.Version, got.Version, "invalid certificate version")
 			assert.Equal(t, tt.want.IsCA, got.IsCA, "invalid certificate isCA")
 			assert.Equal(t, tt.want.IssuerCommonName, got.Issuer.CommonName, "invalid certificate Issuer CN")

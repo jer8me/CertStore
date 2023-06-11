@@ -1,10 +1,6 @@
 package certificates
 
 import (
-	"crypto/dsa"
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -35,21 +31,4 @@ func ParsePEMFile(filename string) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to parse certificate for file %s: %w", filename, err)
 	}
 	return certificate, nil
-}
-
-// PublicKeyType returns the public key type used in an X.509 certificate
-// as a string. It returns an empty string if the type is unknown.
-func PublicKeyType(certificate *x509.Certificate) string {
-	switch certificate.PublicKey.(type) {
-	case *rsa.PublicKey:
-		return "RSA"
-	case *dsa.PublicKey:
-		return "DSA"
-	case *ecdsa.PublicKey:
-		return "ECDSA"
-	case ed25519.PublicKey:
-		return "Ed25519"
-	default:
-		return ""
-	}
 }
