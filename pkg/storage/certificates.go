@@ -50,3 +50,17 @@ func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error)
 	}
 	return id, nil
 }
+
+// GetSignatureAlgorithmId looks up the ID for a SignatureAlgorithm string
+// Error is not nil if the string is invalid or if the database query fails
+func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error) {
+	var id int
+	err := db.QueryRow("SELECT id FROM signaturealgorithm WHERE name = ?", signatureAlgorithm).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("invalid signature algorithm name: %s", signatureAlgorithm)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to query signature algorithm ID: %w", err)
+	}
+	return id, nil
+}
