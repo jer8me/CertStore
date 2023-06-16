@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"crypto/x509"
 	"database/sql"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
@@ -35,6 +36,31 @@ func OpenMySQL(userName, userPass, dbName string) (*sql.DB, error) {
 		return nil, err
 	}
 	return sql.OpenDB(connector), nil
+}
+
+// ToCertificate converts a x509 certificate into a certificate database model
+func ToCertificate(db *sql.DB, x509certificate x509.Certificate) (*CertificateModel, error) {
+	var err error
+	certificateModel := new(CertificateModel)
+	certificateModel.PublicKey, err = x509.MarshalPKIXPublicKey(x509certificate.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	certificateModel.PublicKeyAlgorithm, err = GetPublicKeyAlgorithmId(db, x509certificate.PublicKeyAlgorithm.String())
+	certificateModel.Version = x509certificate.Version
+	certificateModel.SerialNumber = x509certificate.SerialNumber.Text(16)
+	certificateModel.Subject = x509certificate.Subject.CommonName
+	certificateModel.Issuer = x509certificate.Issuer.CommonName
+	certificateModel.NotBefore = x509certificate.NotBefore
+	certificateModel.NotAfter = x509certificate.NotAfter
+	certificateModel.Signature = x509certificate.Signature
+	certificateModel.SignatureAlgorithm, err = GetSignatureAlgorithmId(db, x509certificate.SignatureAlgorithm.String())
+	if err != nil {
+		return nil, err
+	}
+	certificateModel.RawContent = x509certificate.Raw
+
+	return certificateModel, nil
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string

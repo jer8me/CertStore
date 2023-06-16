@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -73,28 +74,28 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 		signatureAlgorithm string
 		wantErr            assert.ErrorAssertionFunc
 	}{
-		{"", "MD2WithRSA", assert.NoError},
-		{"", "MD5WithRSA", assert.NoError},
-		{"", "SHA1WithRSA", assert.NoError},
-		{"", "SHA256WithRSA", assert.NoError},
-		{"", "SHA384WithRSA", assert.NoError},
-		{"", "SHA512WithRSA", assert.NoError},
-		{"", "DSAWithSHA1", assert.NoError},
-		{"", "DSAWithSHA256", assert.NoError},
-		{"", "ECDSAWithSHA1", assert.NoError},
-		{"", "ECDSAWithSHA256", assert.NoError},
-		{"", "ECDSAWithSHA384", assert.NoError},
-		{"", "ECDSAWithSHA512", assert.NoError},
-		{"", "SHA256WithRSAPSS", assert.NoError},
-		{"", "SHA384WithRSAPSS", assert.NoError},
-		{"", "SHA512WithRSAPSS", assert.NoError},
-		{"", "PureEd25519", assert.NoError},
+		{"", "MD2-RSA", assert.NoError},
+		{"", "MD5-RSA", assert.NoError},
+		{"", "SHA1-RSA", assert.NoError},
+		{"", "SHA256-RSA", assert.NoError},
+		{"", "SHA384-RSA", assert.NoError},
+		{"", "SHA512-RSA", assert.NoError},
+		{"", "DSA-SHA1", assert.NoError},
+		{"", "DSA-SHA256", assert.NoError},
+		{"", "ECDSA-SHA1", assert.NoError},
+		{"", "ECDSA-SHA256", assert.NoError},
+		{"", "ECDSA-SHA384", assert.NoError},
+		{"", "ECDSA-SHA512", assert.NoError},
+		{"", "SHA256-RSAPSS", assert.NoError},
+		{"", "SHA384-RSAPSS", assert.NoError},
+		{"", "SHA512-RSAPSS", assert.NoError},
+		{"", "Ed25519", assert.NoError},
 		{"", "Invalid", assert.Error},
 	}
 	for _, tt := range tests {
 		name := tt.name
 		if name == "" {
-			name = "Test" + tt.signatureAlgorithm + "SignatureAlgorithmId"
+			name = "Test" + strings.ReplaceAll(tt.signatureAlgorithm, "-", "With") + "SignatureAlgorithmId"
 		}
 		t.Run(name, func(t *testing.T) {
 			got, err := GetSignatureAlgorithmId(db, tt.signatureAlgorithm)

@@ -221,23 +221,23 @@ CREATE TABLE IF NOT EXISTS CertificateSAN (
 -- -----------------------------------------------------
 INSERT INTO SignatureAlgorithm (id, name)
 VALUES
-  (1, 'UnknownSignatureAlgorithm'),
-  (2, 'MD2WithRSA'),
-  (3, 'MD5WithRSA'),
-  (4, 'SHA1WithRSA'),
-  (5, 'SHA256WithRSA'),
-  (6, 'SHA384WithRSA'),
-  (7, 'SHA512WithRSA'),
-  (8, 'DSAWithSHA1'),
-  (9, 'DSAWithSHA256'),
-  (10, 'ECDSAWithSHA1'),
-  (11, 'ECDSAWithSHA256'),
-  (12, 'ECDSAWithSHA384'),
-  (13, 'ECDSAWithSHA512'),
-  (14, 'SHA256WithRSAPSS'),
-  (15, 'SHA384WithRSAPSS'),
-  (16, 'SHA512WithRSAPSS'),
-  (17, 'PureEd25519')
+  (0, 'Unknown'),
+  (1, 'MD2-RSA'),
+  (2, 'MD5-RSA'),
+  (3, 'SHA1-RSA'),
+  (4, 'SHA256-RSA'),
+  (5, 'SHA384-RSA'),
+  (6, 'SHA512-RSA'),
+  (7, 'DSA-SHA1'),
+  (8, 'DSA-SHA256'),
+  (9, 'ECDSA-SHA1'),
+  (10, 'ECDSA-SHA256'),
+  (11, 'ECDSA-SHA384'),
+  (12, 'ECDSA-SHA512'),
+  (13, 'SHA256-RSAPSS'),
+  (14, 'SHA384-RSAPSS'),
+  (15, 'SHA512-RSAPSS'),
+  (16, 'Ed25519')
 ;
 
 
@@ -246,11 +246,11 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO PublicKeyAlgorithm (id, name)
 VALUES
-  (1, 'UnknownPublicKeyAlgorithm'),
-  (2, 'RSA'),
-  (3, 'DSA'),
-  (4, 'ECDSA'),
-  (5, 'Ed25519')
+  (0, 'Unknown'),
+  (1, 'RSA'),
+  (2, 'DSA'),
+  (3, 'ECDSA'),
+  (4, 'Ed25519')
 ;
 
 
