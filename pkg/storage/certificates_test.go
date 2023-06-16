@@ -12,8 +12,11 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 
 	// Connect to database
 	username := os.Getenv("DB_USERNAME")
+	require.NotEmpty(t, username, "DB_USERNAME must be defined")
 	password := os.Getenv("DB_PASSWORD")
+	require.NotEmpty(t, username, "DB_PASSWORD must be defined")
 	dbName := os.Getenv("DB_NAME")
+	require.NotEmpty(t, username, "DB_NAME must be defined")
 
 	db, err := OpenMySQL(username, password, dbName)
 	if err != nil {
