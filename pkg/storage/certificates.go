@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"time"
@@ -50,7 +51,7 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 		PublicKey:          publicKey,
 		PublicKeyAlgorithm: x509certificate.PublicKeyAlgorithm.String(),
 		Version:            x509certificate.Version,
-		SerialNumber:       x509certificate.SerialNumber.Text(16),
+		SerialNumber:       GetSerialNumber(x509certificate),
 		Subject:            x509certificate.Subject.CommonName,
 		Issuer:             x509certificate.Issuer.CommonName,
 		NotBefore:          x509certificate.NotBefore,
@@ -63,6 +64,13 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 	return certificateModel, nil
 }
 
+// GetSerialNumber returns the serial number of the certificate as a hex string
+func GetSerialNumber(x509certificate *x509.Certificate) string {
+	bytes := x509certificate.SerialNumber.Bytes()
+	return hex.EncodeToString(bytes)
+}
+
+// GetKeyUsages returns a slice of strings representing the key usages included in the certificate
 func GetKeyUsages(x509certificate *x509.Certificate) []string {
 	var keyUsages []string
 	if (x509certificate.KeyUsage & x509.KeyUsageDigitalSignature) != 0 {
