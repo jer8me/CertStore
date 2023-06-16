@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS PrivateKey (
 DROP TABLE IF EXISTS Certificate;
 
 CREATE TABLE IF NOT EXISTS Certificate (
-  id INT NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT,
   publicKey BLOB NOT NULL,
   publicKeyAlgorithm_id INT NOT NULL,
   version SMALLINT NOT NULL,
@@ -259,15 +259,15 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO KeyUsage (id, name)
 VALUES
-  (1, 'KeyUsageDigitalSignature'),
-  (2, 'KeyUsageContentCommitment'),
-  (3, 'KeyUsageKeyEncipherment'),
-  (4, 'KeyUsageDataEncipherment'),
-  (5, 'KeyUsageKeyAgreement'),
-  (6, 'KeyUsageCertSign'),
-  (7, 'KeyUsageCRLSign'),
-  (8, 'KeyUsageEncipherOnly'),
-  (9, 'KeyUsageDecipherOnly')
+  (0, 'DigitalSignature'),
+  (1, 'ContentCommitment'),
+  (2, 'KeyEncipherment'),
+  (3, 'DataEncipherment'),
+  (4, 'KeyAgreement'),
+  (5, 'KeyCertSign'),
+  (6, 'CRLSign'),
+  (7, 'EncipherOnly'),
+  (8, 'DecipherOnly')
 ;
 
 
@@ -294,9 +294,9 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO PrivateKeyType (id, type)
 VALUES
-    (1, 'Unknown'),
-    (2, 'RSA'),
-    (3, 'ECDSA'),
-    (4, 'Ed25519'),
-    (5, 'ECDH')
+    (0, 'Unknown'),
+    (1, 'RSA'),
+    (2, 'ECDSA'),
+    (3, 'Ed25519'),
+    (4, 'ECDH')
 ;
