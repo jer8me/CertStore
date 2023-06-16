@@ -47,6 +47,9 @@ func ToCertificate(db *sql.DB, x509certificate x509.Certificate) (*CertificateMo
 		return nil, err
 	}
 	certificateModel.PublicKeyAlgorithm, err = GetPublicKeyAlgorithmId(db, x509certificate.PublicKeyAlgorithm.String())
+	if err != nil {
+		return nil, err
+	}
 	certificateModel.Version = x509certificate.Version
 	certificateModel.SerialNumber = x509certificate.SerialNumber.Text(16)
 	certificateModel.Subject = x509certificate.Subject.CommonName
