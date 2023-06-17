@@ -7,6 +7,9 @@ import (
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
+	"net"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -33,6 +36,13 @@ func openMySQL(t *testing.T) *sql.DB {
 // Helper function to return the path of a certificate file
 func certPath(filename string) string {
 	return path.Join("../certificates/testdata", filename)
+}
+
+// Helper function to parse a URL. If the URL is invalid, it immediately fails the test
+func parseUrl(t *testing.T, rawURL string) *url.URL {
+	u, err := url.Parse(rawURL)
+	require.NoError(t, err, "invalid URL")
+	return u
 }
 
 func TestStoreCertificate(t *testing.T) {
@@ -156,8 +166,8 @@ func TestGetKeyUsages(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeCertificate := &x509.Certificate{KeyUsage: tt.keyUsage}
-			assert.Equalf(t, tt.want, GetKeyUsages(fakeCertificate), "GetKeyUsages(%v)", tt.keyUsage)
+			mockCertificate := &x509.Certificate{KeyUsage: tt.keyUsage}
+			assert.Equalf(t, tt.want, GetKeyUsages(mockCertificate), "GetKeyUsages(%v)", tt.keyUsage)
 		})
 	}
 }
@@ -180,4 +190,77 @@ func TestCertificateKeyUsage(t *testing.T) {
 			assert.Equalf(t, tt.want, GetKeyUsages(x509certificate), "GetKeyUsages(%v)", tt.filename)
 		})
 	}
+}
+
+func TestToCertificate(t *testing.T) {
+
+	validCert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	require.NoError(t, err, "failed to parse certificate")
+	invalidCert := &x509.Certificate{PublicKey: []byte{0x10, 0x01}}
+
+	tests := []struct {
+		name    string
+		cert    *x509.Certificate
+		want    *CertificateModel
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{"TestValidCertificate", validCert, nil, assert.NoError},
+		{"TestInvalidCertificate", invalidCert, nil, assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ToCertificate(tt.cert)
+			if !tt.wantErr(t, err, fmt.Sprintf("ToCertificate(%v)", tt.cert)) {
+				return
+			}
+			if err == nil {
+				assert.NotNil(t, got)
+			}
+		})
+	}
+}
+
+func TestGetSANs(t *testing.T) {
+	// Mock some data
+	dnsNames := []string{"*.champlain.edu", "champlain.edu"}
+	emailAddresses := []string{"user1@champlain.edu", "user2@champlain.edu", "user3@champlain.edu"}
+	ipAddresses := []net.IP{net.IPv4(208, 115, 107, 132), net.ParseIP("2001:db8::68")}
+	testUrls := []string{"https://www.champlain.edu"}
+	var uris []*url.URL
+	for _, testUrl := range testUrls {
+		uris = append(uris, parseUrl(t, testUrl))
+	}
+
+	mockCertificate := &x509.Certificate{DNSNames: dnsNames, EmailAddresses: emailAddresses,
+		IPAddresses: ipAddresses, URIs: uris}
+	sans := GetSANs(mockCertificate)
+	assert.Contains(t, sans, DnsName)
+	assert.Equal(t, sans[DnsName], dnsNames)
+	assert.Contains(t, sans, EmailAddress)
+	assert.Equal(t, sans[EmailAddress], emailAddresses)
+	assert.Contains(t, sans, IpAddress)
+	assert.Equal(t, sans[IpAddress], []string{"208.115.107.132", "2001:db8::68"})
+	assert.Contains(t, sans, URI)
+	assert.Equal(t, sans[URI], testUrls)
+}
+
+func TestGetSANTypes(t *testing.T) {
+
+	// Connect to database
+	db := openMySQL(t)
+	defer db.Close()
+
+	sanTypes, err := GetSANTypes(db)
+	if err != nil {
+		require.NoError(t, err, "failed to get SAN types")
+	}
+	var sanIds []int
+	var sanNames []string
+	for _, sanType := range sanTypes {
+		assert.False(t, slices.Contains(sanIds, sanType.Id), "duplicate SAN type ID")
+		sanIds = append(sanIds, sanType.Id)
+		assert.False(t, slices.Contains(sanNames, sanType.Name), "duplicate SAN type name")
+		sanNames = append(sanNames, sanType.Name)
+	}
+	assert.Subset(t, sanNames, []string{DnsName, EmailAddress, IpAddress, URI})
 }

@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS SubjectAlternateNameType (
 DROP TABLE IF EXISTS SubjectAlternateName;
 
 CREATE TABLE IF NOT EXISTS SubjectAlternateName (
-  id INT NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT,
   name VARCHAR(256) NOT NULL,
   subjectAlternateNameType_id INT NOT NULL,
   PRIMARY KEY (id ASC),

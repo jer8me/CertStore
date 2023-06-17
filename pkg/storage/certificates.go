@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"log"
 	"time"
 )
 
@@ -24,9 +25,22 @@ type CertificateModel struct {
 	KeyUsages          []string
 	Signature          []byte
 	SignatureAlgorithm string
+	SANs               map[string][]string
 	RawContent         []byte
 	PrivateKeyId       sql.NullInt64
 }
+
+type SANTypeModel struct {
+	Id   int
+	Name string
+}
+
+const (
+	DnsName      = "DNSName"
+	EmailAddress = "EmailAddress"
+	IpAddress    = "IPAddress"
+	URI          = "URI"
+)
 
 func OpenMySQL(userName, userPass, dbName string) (*sql.DB, error) {
 	dbCfg := mysql.NewConfig()
@@ -59,6 +73,7 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 		KeyUsages:          GetKeyUsages(x509certificate),
 		Signature:          x509certificate.Signature,
 		SignatureAlgorithm: x509certificate.SignatureAlgorithm.String(),
+		SANs:               GetSANs(x509certificate),
 		RawContent:         x509certificate.Raw,
 	}
 	return certificateModel, nil
@@ -103,6 +118,35 @@ func GetKeyUsages(x509certificate *x509.Certificate) []string {
 	return keyUsages
 }
 
+// GetSANs returns the map of Subject Alternate Name values declared in the certificate.
+// The key of the map is a SubjectAlternateNameType and the value of the map is a slice of strings.
+// The slice of strings contains the SAN values.
+func GetSANs(x509certificate *x509.Certificate) map[string][]string {
+	sans := make(map[string][]string)
+	// DNS Names
+	if len(x509certificate.DNSNames) > 0 {
+		sans[DnsName] = x509certificate.DNSNames
+	}
+	if len(x509certificate.EmailAddresses) > 0 {
+		sans[EmailAddress] = x509certificate.EmailAddresses
+	}
+	if len(x509certificate.IPAddresses) > 0 {
+		var ipAddresses []string
+		for _, ipAddress := range x509certificate.IPAddresses {
+			ipAddresses = append(ipAddresses, ipAddress.String())
+		}
+		sans[IpAddress] = ipAddresses
+	}
+	if len(x509certificate.URIs) > 0 {
+		var uris []string
+		for _, uri := range x509certificate.URIs {
+			uris = append(uris, uri.String())
+		}
+		sans[URI] = uris
+	}
+	return sans
+}
+
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
 // Error is not nil if the string is invalid or if the database query fails
 func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
@@ -131,6 +175,34 @@ func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error)
 	return id, nil
 }
 
+// GetSANTypes returns a slice of SAN type as stored in the database
+func GetSANTypes(db *sql.DB) ([]SANTypeModel, error) {
+
+	rows, err := db.Query("SELECT id, name FROM SubjectAlternateNameType")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// An SANTypeModel slice to hold data from returned rows.
+	var sanTypes []SANTypeModel
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var sanType SANTypeModel
+		if err := rows.Scan(&sanType.Id, &sanType.Name); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return sanTypes, err
+		}
+		sanTypes = append(sanTypes, sanType)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return sanTypes, err
+	}
+	return sanTypes, nil
+}
+
 func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Get public key algorithm ID for string
@@ -140,6 +212,11 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 	}
 	// Get signature algorithm ID for string
 	signatureAlgorithmId, err := GetSignatureAlgorithmId(db, cert.SignatureAlgorithm)
+	if err != nil {
+		return err
+	}
+	// Get SAN types
+	sanTypes, err := GetSANTypes(db)
 	if err != nil {
 		return err
 	}
@@ -187,6 +264,47 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 			return fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
 		}
 	}
+	// Store Subject Alternate Name
+	for certSanType, certSanValues := range cert.SANs {
+		if len(certSanValues) == 0 {
+			// No values: nothing to store
+			continue
+		}
+		var sanTypeId int
+		found := false
+		// Find SAN Type ID
+		for _, sanType := range sanTypes {
+			if certSanType == sanType.Name {
+				sanTypeId = sanType.Id
+				found = true
+				break
+			}
+		}
+		if !found {
+			// If we cannot find a valid type, something is badly misconfigured: panic
+			log.Panicf("certificate SAN type %s not found in database", certSanType)
+		}
+		// Store SAN values for this SAN type
+		for _, certSanValue := range certSanValues {
+			result, err = tx.ExecContext(ctx, "INSERT INTO SubjectAlternateName (name, subjectAlternateNameType_id) "+
+				"VALUE (?, ?)", certSanValue, sanTypeId)
+			if err != nil {
+				return err
+			}
+			// Get SubjectAlternateName ID from INSERT
+			sanId, err := result.LastInsertId()
+			if err != nil {
+				return err
+			}
+			// Associate SAN ID with certificate
+			_, err = tx.ExecContext(ctx, "INSERT INTO CertificateSAN (certificate_id, subjectAlternateName_id) "+
+				"VALUE (?, ?)", certificateId, sanId)
+			if err != nil {
+				return fmt.Errorf("failed to insert CertificateSAN: %w", err)
+			}
+		}
+	}
+
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit StoreCertificate transaction: %w", err)
