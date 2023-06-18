@@ -220,7 +220,7 @@ func GetSANTypes(db *sql.DB) ([]SANTypeModel, error) {
 	}
 	defer rows.Close()
 
-	// An SANTypeModel slice to hold data from returned rows.
+	// A SANTypeModel slice to hold data from returned rows.
 	var sanTypes []SANTypeModel
 
 	// Loop through rows, using Scan to assign column data to struct fields.
@@ -247,7 +247,7 @@ func GetAttributeTypes(db *sql.DB) ([]AttributeTypeModel, error) {
 	}
 	defer rows.Close()
 
-	// An SANTypeModel slice to hold data from returned rows.
+	// An AttributeTypeModel slice to hold data from returned rows.
 	var attributeTypes []AttributeTypeModel
 
 	// Loop through rows, using Scan to assign column data to struct fields.
