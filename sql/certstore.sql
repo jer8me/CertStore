@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS Certificate (
   notAfter TIMESTAMP NOT NULL,
   signature BLOB NOT NULL,
   signatureAlgorithm_id INT NOT NULL,
+  isCa TINYINT(1) NOT NULL,    -- boolean: 0=false, 1=true
   rawContent BLOB NOT NULL,
   privateKey_id INT NULL,
   PRIMARY KEY (id ASC),

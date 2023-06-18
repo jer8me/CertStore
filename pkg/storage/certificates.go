@@ -26,6 +26,7 @@ type CertificateModel struct {
 	Signature          []byte
 	SignatureAlgorithm string
 	SANs               map[string][]string
+	IsCA               bool
 	RawContent         []byte
 	PrivateKeyId       sql.NullInt64
 }
@@ -74,6 +75,7 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 		Signature:          x509certificate.Signature,
 		SignatureAlgorithm: x509certificate.SignatureAlgorithm.String(),
 		SANs:               GetSANs(x509certificate),
+		IsCA:               x509certificate.IsCA,
 		RawContent:         x509certificate.Raw,
 	}
 	return certificateModel, nil
@@ -234,10 +236,10 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Create a new row in the album_order table.
 	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
-		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, rawContent) "+
-		"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent) "+
+		"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.Subject, cert.Issuer,
-		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.RawContent)
+		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent)
 	if err != nil {
 		return err
 	}
