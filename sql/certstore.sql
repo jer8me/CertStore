@@ -120,6 +120,19 @@ CREATE TABLE IF NOT EXISTS PKIXName (
 
 
 -- -----------------------------------------------------
+-- Table AttributeTypeAndValue
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS AttributeTypeAndValue;
+
+CREATE TABLE IF NOT EXISTS AttributeTypeAndValue (
+  oid VARCHAR(256) NOT NULL,
+  name VARCHAR(32) NOT NULL,
+  description VARCHAR(128) NOT NULL,
+  PRIMARY KEY (oid ASC)
+);
+
+
+-- -----------------------------------------------------
 -- Table CertificateOwner
 -- -----------------------------------------------------
 DROP TABLE IF EXISTS CertificateOwner;
@@ -300,4 +313,21 @@ VALUES
     (2, 'ECDSA'),
     (3, 'Ed25519'),
     (4, 'ECDH')
+;
+
+
+-- -----------------------------------------------------
+-- Populate AttributeTypeAndValue
+-- -----------------------------------------------------
+INSERT INTO AttributeTypeAndValue (oid, name, description)
+VALUES
+    ('2.5.4.3', 'CN', 'Common Name'),
+    ('2.5.4.5', 'SERIALNUMBER', 'Serial Number'),
+    ('2.5.4.6', 'C', 'Country Name'),
+    ('2.5.4.7', 'L', 'Locality Name'),
+    ('2.5.4.8', 'ST', 'State or Province Name'),
+    ('2.5.4.9', 'STREET', 'Street Address'),
+    ('2.5.4.10', 'O', 'Organization Name'),
+    ('2.5.4.11', 'OU', 'Organization Unit Name'),
+    ('2.5.4.17', 'POSTALCODE', 'Postal Code')
 ;
