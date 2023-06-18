@@ -266,6 +266,15 @@ func GetAttributeTypes(db *sql.DB) ([]AttributeTypeModel, error) {
 	return attributeTypes, nil
 }
 
+func knownOid(oid string, attributeTypes []AttributeTypeModel) bool {
+	for _, attributeType := range attributeTypes {
+		if attributeType.Oid == oid {
+			return true
+		}
+	}
+	return false
+}
+
 func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Get public key algorithm ID for string
@@ -335,14 +344,7 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Store Issuer attributes
 	for _, attribute := range cert.Issuer {
-		found := false
-		for _, attributeType := range attributeTypes {
-			if attributeType.Oid == attribute.Oid {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !knownOid(attribute.Oid, attributeTypes) {
 			log.Printf("unknown %s attribute OID: %s, value: %s\n", Issuer, attribute.Oid, attribute.Value)
 			continue
 		}
@@ -355,14 +357,7 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Store Subject attributes
 	for _, attribute := range cert.Subject {
-		found := false
-		for _, attributeType := range attributeTypes {
-			if attributeType.Oid == attribute.Oid {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !knownOid(attribute.Oid, attributeTypes) {
 			log.Printf("unknown %s attribute OID: %s, value: %s\n", Subject, attribute.Oid, attribute.Value)
 			continue
 		}
