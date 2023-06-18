@@ -2,7 +2,9 @@ package storage
 
 import (
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/asn1"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/stretchr/testify/assert"
@@ -244,6 +246,7 @@ func TestGetSANs(t *testing.T) {
 	assert.Equal(t, sans[URI], testUrls)
 }
 
+// TestGetSANTypes tests the general sanity of the data populated in the SubjectAlternateNameType table
 func TestGetSANTypes(t *testing.T) {
 
 	// Connect to database
@@ -263,4 +266,60 @@ func TestGetSANTypes(t *testing.T) {
 		sanNames = append(sanNames, sanType.Name)
 	}
 	assert.Subset(t, sanNames, []string{DnsName, EmailAddress, IpAddress, URI})
+}
+
+// TestGetAttributeTypes tests the general sanity of the data populated in the AttributeType table
+func TestGetAttributeTypes(t *testing.T) {
+
+	// Connect to database
+	db := openMySQL(t)
+	defer db.Close()
+
+	attributeTypes, err := GetAttributeTypes(db)
+	if err != nil {
+		require.NoError(t, err, "failed to get attribute types")
+	}
+	var oids []string
+	for _, attributeType := range attributeTypes {
+		assert.False(t, slices.Contains(oids, attributeType.Oid), "duplicate attribute type")
+		oids = append(oids, attributeType.Oid)
+		assert.NotEmpty(t, attributeType.Name, "attribute type name is missing")
+		assert.NotEmpty(t, attributeType.Description, "attribute type description is missing")
+	}
+}
+
+// TestGetAttributes tests that a pkix Name structure is correctly parsed into a slice of attributes
+func TestGetAttributes(t *testing.T) {
+	countryName := "US"
+	stateOrProvinceName := "Vermont"
+	localityName := "Burlington"
+	organizationName := "Champlain College"
+	commonName := "*.champlain.edu"
+
+	attributes := []pkix.AttributeTypeAndValue{
+		{Type: asn1.ObjectIdentifier{2, 5, 4, 6}, Value: countryName},
+		{Type: asn1.ObjectIdentifier{2, 5, 4, 8}, Value: stateOrProvinceName},
+		{Type: asn1.ObjectIdentifier{2, 5, 4, 7}, Value: localityName},
+		{Type: asn1.ObjectIdentifier{2, 5, 4, 10}, Value: organizationName},
+		{Type: asn1.ObjectIdentifier{2, 5, 4, 3}, Value: commonName},
+	}
+	var rdns pkix.RDNSequence
+	rdns = append(rdns, attributes)
+
+	name := pkix.Name{}
+	name.FillFromRDNSequence(&rdns)
+
+	assert.Equal(t, []string{countryName}, name.Country, "invalid country name")
+	assert.Equal(t, []string{stateOrProvinceName}, name.Province, "invalid state name")
+	assert.Equal(t, []string{localityName}, name.Locality, "invalid locality name")
+	assert.Equal(t, []string{organizationName}, name.Organization, "invalid organization name")
+	assert.Equal(t, commonName, name.CommonName, "invalid common name")
+
+	parsedAttributes := GetAttributes(name)
+	assert.Len(t, parsedAttributes, 5, "invalid number of attributes")
+	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.6", Value: countryName})
+	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.8", Value: stateOrProvinceName})
+	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.7", Value: localityName})
+	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.10", Value: organizationName})
+	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.3", Value: commonName})
 }

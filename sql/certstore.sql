@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS PrivateKey (
   privateKeyType_id INT NOT NULL,
   PRIMARY KEY (id ASC),
   INDEX (privateKeyType_id ASC),
-  CONSTRAINT fk_PrivateKey_PrivateKeyType1
+  CONSTRAINT fk_PrivateKey_PrivateKeyType
     FOREIGN KEY (privateKeyType_id)
     REFERENCES PrivateKeyType (id)
 );
@@ -99,36 +99,47 @@ CREATE TABLE IF NOT EXISTS Certificate (
   CONSTRAINT fk_Certificate_PublicKeyAlgorithm
     FOREIGN KEY (publicKeyAlgorithm_id)
     REFERENCES PublicKeyAlgorithm (id),
-  CONSTRAINT fk_Certificate_SignatureAlgorithm1
+  CONSTRAINT fk_Certificate_SignatureAlgorithm
     FOREIGN KEY (signatureAlgorithm_id)
     REFERENCES SignatureAlgorithm (id),
-  CONSTRAINT fk_Certificate_PrivateKey1
+  CONSTRAINT fk_Certificate_PrivateKey
     FOREIGN KEY (privateKey_id)
     REFERENCES PrivateKey (id)
 );
 
 
 -- -----------------------------------------------------
--- Table PKIXName
+-- Table AttributeType
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS PKIXName;
+DROP TABLE IF EXISTS AttributeType;
 
-CREATE TABLE IF NOT EXISTS PKIXName (
-  id INT NOT NULL,
-  PRIMARY KEY (id ASC)
+CREATE TABLE IF NOT EXISTS AttributeType (
+  oid VARCHAR(128) NOT NULL,
+  name VARCHAR(16) NOT NULL,
+  description VARCHAR(64) NOT NULL,
+  PRIMARY KEY (oid ASC)
 );
 
 
 -- -----------------------------------------------------
--- Table AttributeTypeAndValue
+-- Table CertificateAttribute
 -- -----------------------------------------------------
-DROP TABLE IF EXISTS AttributeTypeAndValue;
+DROP TABLE IF EXISTS CertificateAttribute;
 
-CREATE TABLE IF NOT EXISTS AttributeTypeAndValue (
-  oid VARCHAR(256) NOT NULL,
-  name VARCHAR(32) NOT NULL,
-  description VARCHAR(128) NOT NULL,
-  PRIMARY KEY (oid ASC)
+CREATE TABLE IF NOT EXISTS CertificateAttribute (
+  certificate_id INT NOT NULL,
+  type VARCHAR(8) NOT NULL,    -- Issuer or Subject
+  oid VARCHAR(128) NOT NULL,
+  value VARCHAR(512),
+  INDEX (certificate_id ASC),
+  INDEX (oid ASC),
+  INDEX (value ASC),
+  CONSTRAINT fk_CertificateAttribute_Certificate
+    FOREIGN KEY (certificate_id)
+    REFERENCES Certificate (id),
+  CONSTRAINT fk_CertificateAttribute_AttributeType
+    FOREIGN KEY (oid)
+    REFERENCES AttributeType (oid)
 );
 
 
@@ -140,12 +151,12 @@ DROP TABLE IF EXISTS CertificateOwner;
 CREATE TABLE IF NOT EXISTS CertificateOwner (
   certificate_id INT NOT NULL,
   user_id INT NOT NULL,
-  INDEX (user_id ASC),
   INDEX (certificate_id ASC),
-  CONSTRAINT fk_Certificate_has_User_Certificate1
+  INDEX (user_id ASC),
+  CONSTRAINT fk_CertificateOwner_Certificate
     FOREIGN KEY (certificate_id)
     REFERENCES Certificate (id),
-  CONSTRAINT fk_Certificate_has_User_User1
+  CONSTRAINT fk_CertificateOwner_User
     FOREIGN KEY (user_id)
     REFERENCES User (id)
 );
@@ -173,10 +184,10 @@ CREATE TABLE IF NOT EXISTS CertificateKeyUsage (
   keyUsage_id INT NOT NULL,
   INDEX (keyUsage_id ASC),
   INDEX (certificate_id ASC),
-  CONSTRAINT fk_Certificate_has_KeyUsage_Certificate1
+  CONSTRAINT fk_CertificateKeyUsage_Certificate
     FOREIGN KEY (certificate_id)
     REFERENCES Certificate (id),
-  CONSTRAINT fk_Certificate_has_KeyUsage_KeyUsage1
+  CONSTRAINT fk_CertificateKeyUsage_KeyUsage
     FOREIGN KEY (keyUsage_id)
     REFERENCES KeyUsage (id)
 );
@@ -205,7 +216,7 @@ CREATE TABLE IF NOT EXISTS SubjectAlternateName (
   subjectAlternateNameType_id INT NOT NULL,
   PRIMARY KEY (id ASC),
   INDEX (subjectAlternateNameType_id ASC),
-  CONSTRAINT fk_SubjectAlternateName_SubjectAlternateNameType1
+  CONSTRAINT fk_SubjectAlternateName_SubjectAlternateNameType
     FOREIGN KEY (subjectAlternateNameType_id)
     REFERENCES SubjectAlternateNameType (id)
 );
@@ -221,10 +232,10 @@ CREATE TABLE IF NOT EXISTS CertificateSAN (
   subjectAlternateName_id INT NOT NULL,
   INDEX (subjectAlternateName_id ASC),
   INDEX (certificate_id ASC),
-  CONSTRAINT fk_Certificate_has_SubjectAlternateName_Certificate1
+  CONSTRAINT fk_CertificateSAN_Certificate
     FOREIGN KEY (certificate_id)
     REFERENCES Certificate (id),
-  CONSTRAINT fk_Certificate_has_SubjectAlternateName_SubjectAlternateName1
+  CONSTRAINT fk_CertificateSAN_SubjectAlternateName
     FOREIGN KEY (subjectAlternateName_id)
     REFERENCES SubjectAlternateName (id)
 );
@@ -317,9 +328,9 @@ VALUES
 
 
 -- -----------------------------------------------------
--- Populate AttributeTypeAndValue
+-- Populate AttributeType
 -- -----------------------------------------------------
-INSERT INTO AttributeTypeAndValue (oid, name, description)
+INSERT INTO AttributeType (oid, name, description)
 VALUES
     ('2.5.4.3', 'CN', 'Common Name'),
     ('2.5.4.5', 'SERIALNUMBER', 'Serial Number'),

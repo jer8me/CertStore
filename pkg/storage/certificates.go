@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +12,11 @@ import (
 	"time"
 )
 
+type Attribute struct {
+	Oid   string
+	Value string
+}
+
 // CertificateModel represents the database model for a certificate
 type CertificateModel struct {
 	Id                 int64
@@ -18,8 +24,10 @@ type CertificateModel struct {
 	PublicKeyAlgorithm string
 	Version            int
 	SerialNumber       string
-	Subject            string
-	Issuer             string
+	Subject            []Attribute
+	Issuer             []Attribute
+	SubjectCN          string
+	IssuerCN           string
 	NotBefore          time.Time
 	NotAfter           time.Time
 	KeyUsages          []string
@@ -29,6 +37,12 @@ type CertificateModel struct {
 	IsCA               bool
 	RawContent         []byte
 	PrivateKeyId       sql.NullInt64
+}
+
+type AttributeTypeModel struct {
+	Oid         string
+	Name        string
+	Description string
 }
 
 type SANTypeModel struct {
@@ -41,6 +55,11 @@ const (
 	EmailAddress = "EmailAddress"
 	IpAddress    = "IPAddress"
 	URI          = "URI"
+)
+
+const (
+	Issuer  = "Issuer"
+	Subject = "Subject"
 )
 
 func OpenMySQL(userName, userPass, dbName string) (*sql.DB, error) {
@@ -67,8 +86,10 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 		PublicKeyAlgorithm: x509certificate.PublicKeyAlgorithm.String(),
 		Version:            x509certificate.Version,
 		SerialNumber:       GetSerialNumber(x509certificate),
-		Subject:            x509certificate.Subject.CommonName,
-		Issuer:             x509certificate.Issuer.CommonName,
+		Subject:            GetAttributes(x509certificate.Subject),
+		Issuer:             GetAttributes(x509certificate.Issuer),
+		SubjectCN:          x509certificate.Subject.CommonName,
+		IssuerCN:           x509certificate.Issuer.CommonName,
 		NotBefore:          x509certificate.NotBefore,
 		NotAfter:           x509certificate.NotAfter,
 		KeyUsages:          GetKeyUsages(x509certificate),
@@ -149,6 +170,19 @@ func GetSANs(x509certificate *x509.Certificate) map[string][]string {
 	return sans
 }
 
+// GetAttributes extracts the attribute types and values from an X.509 distinguished name.
+func GetAttributes(dn pkix.Name) []Attribute {
+	var attributes []Attribute
+	for _, rdn := range dn.Names {
+		attribute := Attribute{
+			Oid:   rdn.Type.String(),
+			Value: fmt.Sprint(rdn.Value),
+		}
+		attributes = append(attributes, attribute)
+	}
+	return attributes
+}
+
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
 // Error is not nil if the string is invalid or if the database query fails
 func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
@@ -205,6 +239,33 @@ func GetSANTypes(db *sql.DB) ([]SANTypeModel, error) {
 	return sanTypes, nil
 }
 
+func GetAttributeTypes(db *sql.DB) ([]AttributeTypeModel, error) {
+
+	rows, err := db.Query("SELECT oid, name, description FROM AttributeType")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// An SANTypeModel slice to hold data from returned rows.
+	var attributeTypes []AttributeTypeModel
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var attributeType AttributeTypeModel
+		if err := rows.Scan(&attributeType.Oid, &attributeType.Name, &attributeType.Description); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return attributeTypes, err
+		}
+		attributeTypes = append(attributeTypes, attributeType)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return attributeTypes, err
+	}
+	return attributeTypes, nil
+}
+
 func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 
 	// Get public key algorithm ID for string
@@ -219,6 +280,11 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 	}
 	// Get SAN types
 	sanTypes, err := GetSANTypes(db)
+	if err != nil {
+		return err
+	}
+	// Get attribute types
+	attributeTypes, err := GetAttributeTypes(db)
 	if err != nil {
 		return err
 	}
@@ -238,7 +304,7 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
 		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent) "+
 		"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.Subject, cert.Issuer,
+		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN,
 		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent)
 	if err != nil {
 		return err
@@ -266,6 +332,47 @@ func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
 			return fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
 		}
 	}
+
+	// Store Issuer attributes
+	for _, attribute := range cert.Issuer {
+		found := false
+		for _, attributeType := range attributeTypes {
+			if attributeType.Oid == attribute.Oid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("unknown %s attribute OID: %s, value: %s\n", Issuer, attribute.Oid, attribute.Value)
+			continue
+		}
+		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
+			"VALUE (?, ?, ?, ?)", certificateId, Issuer, attribute.Oid, attribute.Value)
+		if err != nil {
+			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Issuer, err)
+		}
+	}
+
+	// Store Subject attributes
+	for _, attribute := range cert.Subject {
+		found := false
+		for _, attributeType := range attributeTypes {
+			if attributeType.Oid == attribute.Oid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("unknown %s attribute OID: %s, value: %s\n", Subject, attribute.Oid, attribute.Value)
+			continue
+		}
+		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
+			"VALUE (?, ?, ?, ?)", certificateId, Subject, attribute.Oid, attribute.Value)
+		if err != nil {
+			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Subject, err)
+		}
+	}
+
 	// Store Subject Alternate Name
 	for certSanType, certSanValues := range cert.SANs {
 		if len(certSanValues) == 0 {
