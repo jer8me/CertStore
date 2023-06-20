@@ -37,7 +37,7 @@ func TestStoreCertificate(t *testing.T) {
 		require.NoError(t, err, "failed to read certificate")
 	}
 	// Transform x509 certificate to certificate DB model
-	certModel, err := ToCertificate(x509cert)
+	certificate, err := ToCertificate(x509cert)
 	if err != nil {
 		require.NoError(t, err, "failed to transform x509 certificate")
 	}
@@ -46,7 +46,7 @@ func TestStoreCertificate(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	err = StoreCertificate(db, certModel)
+	err = StoreCertificate(db, certificate)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}

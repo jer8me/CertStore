@@ -65,7 +65,7 @@ func ToCertificate(x509certificate *x509.Certificate) (*Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	certificateModel := &Certificate{
+	certificate := &Certificate{
 		PublicKey:          publicKey,
 		PublicKeyAlgorithm: x509certificate.PublicKeyAlgorithm.String(),
 		Version:            x509certificate.Version,
@@ -83,7 +83,7 @@ func ToCertificate(x509certificate *x509.Certificate) (*Certificate, error) {
 		IsCA:               x509certificate.IsCA,
 		RawContent:         x509certificate.Raw,
 	}
-	return certificateModel, nil
+	return certificate, nil
 }
 
 // GetSerialNumber returns the serial number of the certificate as a hex string
