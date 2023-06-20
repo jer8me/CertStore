@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 )
 
 // Helper function to open a database connection
-func openMySql(t *testing.T) CertificateRepository {
+func openMySql(t *testing.T) *sql.DB {
 	// Connect to database
 	username := os.Getenv("DB_USERNAME")
 	require.NotEmpty(t, username, "DB_USERNAME must be defined")
@@ -21,12 +22,11 @@ func openMySql(t *testing.T) CertificateRepository {
 	dbName := os.Getenv("DB_NAME")
 	require.NotEmpty(t, dbName, "DB_NAME must be defined")
 
-	certRepo := NewMySqlCertificateRepository(username, password, dbName)
-	err := certRepo.Open()
+	db, err := OpenMySqlDB(username, password, dbName)
 	if err != nil {
 		require.NoError(t, err, "failed to open database '%s' for user '%s'", dbName, username)
 	}
-	return certRepo
+	return db
 }
 
 func TestStoreCertificate(t *testing.T) {
@@ -43,10 +43,10 @@ func TestStoreCertificate(t *testing.T) {
 	}
 
 	// Connect to database
-	repo := openMySql(t)
-	defer repo.Close()
+	db := openMySql(t)
+	defer db.Close()
 
-	err = repo.StoreCertificate(certModel)
+	err = StoreCertificate(db, certModel)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}
@@ -55,9 +55,8 @@ func TestStoreCertificate(t *testing.T) {
 func TestGetPublicKeyAlgorithmId(t *testing.T) {
 
 	// Connect to database
-	repo := openMySql(t)
-	defer repo.Close()
-	db := repo.(*mySqlRepository).db
+	db := openMySql(t)
+	defer db.Close()
 
 	tests := []struct {
 		name               string
@@ -90,9 +89,8 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 func TestGetSignatureAlgorithmId(t *testing.T) {
 
 	// Connect to database
-	repo := openMySql(t)
-	defer repo.Close()
-	db := repo.(*mySqlRepository).db
+	db := openMySql(t)
+	defer db.Close()
 
 	tests := []struct {
 		name               string
@@ -138,9 +136,8 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 func TestGetSANTypes(t *testing.T) {
 
 	// Connect to database
-	repo := openMySql(t)
-	defer repo.Close()
-	db := repo.(*mySqlRepository).db
+	db := openMySql(t)
+	defer db.Close()
 
 	sanTypes, err := GetSANTypes(db)
 	if err != nil {
@@ -161,9 +158,8 @@ func TestGetSANTypes(t *testing.T) {
 func TestGetAttributeTypes(t *testing.T) {
 
 	// Connect to database
-	repo := openMySql(t)
-	defer repo.Close()
-	db := repo.(*mySqlRepository).db
+	db := openMySql(t)
+	defer db.Close()
 
 	attributeTypes, err := GetAttributeTypes(db)
 	if err != nil {
