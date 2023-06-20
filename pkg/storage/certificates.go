@@ -1,14 +1,11 @@
 package storage
 
 import (
-	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
-	"log"
 	"time"
 )
 
@@ -17,8 +14,8 @@ type Attribute struct {
 	Value string
 }
 
-// CertificateModel represents the database model for a certificate
-type CertificateModel struct {
+// Certificate represents the database model for a certificate
+type Certificate struct {
 	Id                 int64
 	PublicKey          []byte
 	PublicKeyAlgorithm string
@@ -39,13 +36,13 @@ type CertificateModel struct {
 	PrivateKeyId       sql.NullInt64
 }
 
-type AttributeTypeModel struct {
+type AttributeType struct {
 	Oid         string
 	Name        string
 	Description string
 }
 
-type SANTypeModel struct {
+type SANType struct {
 	Id   int
 	Name string
 }
@@ -62,26 +59,13 @@ const (
 	Subject = "Subject"
 )
 
-func OpenMySQL(userName, userPass, dbName string) (*sql.DB, error) {
-	dbCfg := mysql.NewConfig()
-	dbCfg.User = userName
-	dbCfg.Passwd = userPass
-	dbCfg.DBName = dbName
-
-	connector, err := mysql.NewConnector(dbCfg)
-	if err != nil {
-		return nil, err
-	}
-	return sql.OpenDB(connector), nil
-}
-
 // ToCertificate converts a x509 certificate into a certificate database model
-func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error) {
+func ToCertificate(x509certificate *x509.Certificate) (*Certificate, error) {
 	publicKey, err := x509.MarshalPKIXPublicKey(x509certificate.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	certificateModel := &CertificateModel{
+	certificateModel := &Certificate{
 		PublicKey:          publicKey,
 		PublicKeyAlgorithm: x509certificate.PublicKeyAlgorithm.String(),
 		Version:            x509certificate.Version,
@@ -106,6 +90,19 @@ func ToCertificate(x509certificate *x509.Certificate) (*CertificateModel, error)
 func GetSerialNumber(x509certificate *x509.Certificate) string {
 	bytes := x509certificate.SerialNumber.Bytes()
 	return hex.EncodeToString(bytes)
+}
+
+// GetAttributes extracts the attribute types and values from an X.509 distinguished name.
+func GetAttributes(dn pkix.Name) []Attribute {
+	var attributes []Attribute
+	for _, rdn := range dn.Names {
+		attribute := Attribute{
+			Oid:   rdn.Type.String(),
+			Value: fmt.Sprint(rdn.Value),
+		}
+		attributes = append(attributes, attribute)
+	}
+	return attributes
 }
 
 // GetKeyUsages returns a slice of strings representing the key usages included in the certificate
@@ -168,251 +165,4 @@ func GetSANs(x509certificate *x509.Certificate) map[string][]string {
 		sans[URI] = uris
 	}
 	return sans
-}
-
-// GetAttributes extracts the attribute types and values from an X.509 distinguished name.
-func GetAttributes(dn pkix.Name) []Attribute {
-	var attributes []Attribute
-	for _, rdn := range dn.Names {
-		attribute := Attribute{
-			Oid:   rdn.Type.String(),
-			Value: fmt.Sprint(rdn.Value),
-		}
-		attributes = append(attributes, attribute)
-	}
-	return attributes
-}
-
-// GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
-// Error is not nil if the string is invalid or if the database query fails
-func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
-	var id int
-	err := db.QueryRow("SELECT id FROM PublicKeyAlgorithm WHERE name = ?", publicKeyAlgorithm).Scan(&id)
-	if err == sql.ErrNoRows {
-		return 0, fmt.Errorf("invalid public key algorithm name: %s", publicKeyAlgorithm)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to query public key algorithm ID: %w", err)
-	}
-	return id, nil
-}
-
-// GetSignatureAlgorithmId looks up the ID for a SignatureAlgorithm string
-// Error is not nil if the string is invalid or if the database query fails
-func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error) {
-	var id int
-	err := db.QueryRow("SELECT id FROM SignatureAlgorithm WHERE name = ?", signatureAlgorithm).Scan(&id)
-	if err == sql.ErrNoRows {
-		return 0, fmt.Errorf("invalid signature algorithm name: %s", signatureAlgorithm)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to query signature algorithm ID: %w", err)
-	}
-	return id, nil
-}
-
-// GetSANTypes returns a slice of SAN type as stored in the database
-func GetSANTypes(db *sql.DB) ([]SANTypeModel, error) {
-
-	rows, err := db.Query("SELECT id, name FROM SubjectAlternateNameType")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// A SANTypeModel slice to hold data from returned rows.
-	var sanTypes []SANTypeModel
-
-	// Loop through rows, using Scan to assign column data to struct fields.
-	for rows.Next() {
-		var sanType SANTypeModel
-		if err := rows.Scan(&sanType.Id, &sanType.Name); err != nil {
-			// Error happened while scanning rows: return the rows we scanned so far and the error
-			return sanTypes, err
-		}
-		sanTypes = append(sanTypes, sanType)
-	}
-	// Check if an error happened during the iteration
-	if err = rows.Err(); err != nil {
-		return sanTypes, err
-	}
-	return sanTypes, nil
-}
-
-func GetAttributeTypes(db *sql.DB) ([]AttributeTypeModel, error) {
-
-	rows, err := db.Query("SELECT oid, name, description FROM AttributeType")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// An AttributeTypeModel slice to hold data from returned rows.
-	var attributeTypes []AttributeTypeModel
-
-	// Loop through rows, using Scan to assign column data to struct fields.
-	for rows.Next() {
-		var attributeType AttributeTypeModel
-		if err := rows.Scan(&attributeType.Oid, &attributeType.Name, &attributeType.Description); err != nil {
-			// Error happened while scanning rows: return the rows we scanned so far and the error
-			return attributeTypes, err
-		}
-		attributeTypes = append(attributeTypes, attributeType)
-	}
-	// Check if an error happened during the iteration
-	if err = rows.Err(); err != nil {
-		return attributeTypes, err
-	}
-	return attributeTypes, nil
-}
-
-func knownOid(oid string, attributeTypes []AttributeTypeModel) bool {
-	for _, attributeType := range attributeTypes {
-		if attributeType.Oid == oid {
-			return true
-		}
-	}
-	return false
-}
-
-func StoreCertificate(db *sql.DB, cert *CertificateModel) error {
-
-	// Get public key algorithm ID for string
-	publicKeyAlgorithmId, err := GetPublicKeyAlgorithmId(db, cert.PublicKeyAlgorithm)
-	if err != nil {
-		return err
-	}
-	// Get signature algorithm ID for string
-	signatureAlgorithmId, err := GetSignatureAlgorithmId(db, cert.SignatureAlgorithm)
-	if err != nil {
-		return err
-	}
-	// Get SAN types
-	sanTypes, err := GetSANTypes(db)
-	if err != nil {
-		return err
-	}
-	// Get attribute types
-	attributeTypes, err := GetAttributeTypes(db)
-	if err != nil {
-		return err
-	}
-
-	// Create context for transaction
-	ctx := context.Background()
-
-	// Get a Tx for making transaction requests.
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	// Defer transaction rollback in case anything fails.
-	defer tx.Rollback()
-
-	// Create a new row in the album_order table.
-	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
-		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent) "+
-		"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN,
-		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent)
-	if err != nil {
-		return err
-	}
-	// Get certificate ID from INSERT
-	certificateId, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	// Associate key usages with certificate
-	for _, keyUsage := range cert.KeyUsages {
-		// Lookup key usage
-		var keyUsageId int
-		err = tx.QueryRow("SELECT id FROM KeyUsage WHERE name = ?", keyUsage).Scan(&keyUsageId)
-		if err == sql.ErrNoRows {
-			return fmt.Errorf("invalid key usage: %s", keyUsage)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to query key usage ID: %w", err)
-		}
-		// Insert
-		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateKeyUsage (certificate_id, keyUsage_id) VALUE (?, ?)",
-			certificateId, keyUsageId)
-		if err != nil {
-			return fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
-		}
-	}
-
-	// Store Issuer attributes
-	for _, attribute := range cert.Issuer {
-		if !knownOid(attribute.Oid, attributeTypes) {
-			log.Printf("unknown %s attribute OID: %s, value: %s\n", Issuer, attribute.Oid, attribute.Value)
-			continue
-		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
-			"VALUE (?, ?, ?, ?)", certificateId, Issuer, attribute.Oid, attribute.Value)
-		if err != nil {
-			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Issuer, err)
-		}
-	}
-
-	// Store Subject attributes
-	for _, attribute := range cert.Subject {
-		if !knownOid(attribute.Oid, attributeTypes) {
-			log.Printf("unknown %s attribute OID: %s, value: %s\n", Subject, attribute.Oid, attribute.Value)
-			continue
-		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
-			"VALUE (?, ?, ?, ?)", certificateId, Subject, attribute.Oid, attribute.Value)
-		if err != nil {
-			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Subject, err)
-		}
-	}
-
-	// Store Subject Alternate Name
-	for certSanType, certSanValues := range cert.SANs {
-		if len(certSanValues) == 0 {
-			// No values: nothing to store
-			continue
-		}
-		var sanTypeId int
-		found := false
-		// Find SAN Type ID
-		for _, sanType := range sanTypes {
-			if certSanType == sanType.Name {
-				sanTypeId = sanType.Id
-				found = true
-				break
-			}
-		}
-		if !found {
-			// If we cannot find a valid type, something is badly misconfigured: panic
-			log.Panicf("certificate SAN type %s not found in database", certSanType)
-		}
-		// Store SAN values for this SAN type
-		for _, certSanValue := range certSanValues {
-			result, err = tx.ExecContext(ctx, "INSERT INTO SubjectAlternateName (name, subjectAlternateNameType_id) "+
-				"VALUE (?, ?)", certSanValue, sanTypeId)
-			if err != nil {
-				return err
-			}
-			// Get SubjectAlternateName ID from INSERT
-			sanId, err := result.LastInsertId()
-			if err != nil {
-				return err
-			}
-			// Associate SAN ID with certificate
-			_, err = tx.ExecContext(ctx, "INSERT INTO CertificateSAN (certificate_id, subjectAlternateName_id) "+
-				"VALUE (?, ?)", certificateId, sanId)
-			if err != nil {
-				return fmt.Errorf("failed to insert CertificateSAN: %w", err)
-			}
-		}
-	}
-
-	// Commit the transaction.
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit StoreCertificate transaction: %w", err)
-	}
-
-	return err
 }
