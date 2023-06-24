@@ -4,8 +4,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/asn1"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +19,8 @@ type Attribute struct {
 	Value string
 }
 
+type Attributes []Attribute
+
 // Certificate represents the database model for a certificate
 type Certificate struct {
 	Id                 int64
@@ -21,8 +28,8 @@ type Certificate struct {
 	PublicKeyAlgorithm string
 	Version            int
 	SerialNumber       string
-	Subject            []Attribute
-	Issuer             []Attribute
+	Subject            Attributes
+	Issuer             Attributes
 	SubjectCN          string
 	IssuerCN           string
 	NotBefore          time.Time
@@ -165,4 +172,42 @@ func GetSANs(x509certificate *x509.Certificate) map[string][]string {
 		sans[URI] = uris
 	}
 	return sans
+}
+
+func ToObjectIdentifier(oidstring string) (asn1.ObjectIdentifier, error) {
+	parts := strings.Split(oidstring, ".")
+	if len(parts) == 0 {
+		return nil, errors.New("OID string is empty")
+	}
+	var err error
+	oid := make(asn1.ObjectIdentifier, len(parts), len(parts))
+	for i, part := range parts {
+		oid[i], err = strconv.Atoi(part)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return oid, nil
+}
+
+func (attributes Attributes) String() string {
+	var pkixAttributes []pkix.AttributeTypeAndValue
+	for _, attribute := range attributes {
+		oid, err := ToObjectIdentifier(attribute.Oid)
+		if err != nil {
+			// If we have an invalid OID string here, something is very wrong with the data stored in the database
+			log.Panicf("invalid OID string: %v", err)
+		}
+		pkixAttribute := pkix.AttributeTypeAndValue{
+			Type:  oid,
+			Value: attribute.Value,
+		}
+		pkixAttributes = append(pkixAttributes, pkixAttribute)
+	}
+	var rdns pkix.RDNSequence
+	rdns = append(rdns, pkixAttributes)
+
+	var name pkix.Name
+	name.FillFromRDNSequence(&rdns)
+	return name.String()
 }

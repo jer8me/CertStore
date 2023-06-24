@@ -19,15 +19,13 @@ var (
 )
 
 var storeCmd = &cobra.Command{
-	Use:     "store cert_path [...cert_path]",
-	Aliases: []string{"s"},
-	Args:    cobra.MinimumNArgs(1),
-	Short:   "Store a certificate",
+	Args:  cobra.MinimumNArgs(1),
+	Short: "Store a certificate",
 	Run: func(cmd *cobra.Command, args []string) {
 		for _, certPath := range args {
-			err := certstore.StoreCertificate(certPath, userName, userPassword, dbName)
+			certificateId, err := certstore.StoreCertificate(certPath, userName, userPassword, dbName)
 			if err == nil {
-				fmt.Printf("Certificate %s successfully stored\n", certPath)
+				fmt.Printf("Certificate %s successfully stored (certificate ID=%d)\n", certPath, certificateId)
 			} else {
 				fmt.Printf("Failed to store certificate %s: %v\n", certPath, err)
 			}

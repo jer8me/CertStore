@@ -59,10 +59,11 @@ func TestStoreCertificate(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	err = StoreCertificate(db, certificate)
+	certificateId, err := StoreCertificate(db, certificate)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}
+	assert.Positive(t, certificateId, "invalid certificate ID")
 }
 
 func TestGetPublicKeyAlgorithmId(t *testing.T) {

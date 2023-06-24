@@ -35,8 +35,16 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	}
 
 	// Fetch Subject Attributes for this certificate ID
+	cert.Subject, err = GetCertificateAttributes(db, certificateId, Subject)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query certificate %s attributes: %w", Subject, err)
+	}
 
 	// Fetch Issuer Attributes for this certificate ID
+	cert.Issuer, err = GetCertificateAttributes(db, certificateId, Issuer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query certificate %s attributes: %w", Issuer, err)
+	}
 
 	// Fetch Key Usages for this certificate ID
 	cert.KeyUsages, err = GetCertificateKeyUsages(db, certificateId)
@@ -53,27 +61,27 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	return cert, nil
 }
 
-func StoreCertificate(db *sql.DB, cert *Certificate) error {
+func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 
 	// Get public key algorithm ID for string
 	publicKeyAlgorithmId, err := GetPublicKeyAlgorithmId(db, cert.PublicKeyAlgorithm)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Get signature algorithm ID for string
 	signatureAlgorithmId, err := GetSignatureAlgorithmId(db, cert.SignatureAlgorithm)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Get SAN types
 	sanTypes, err := GetSANTypes(db)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Get attribute types
 	attributeTypes, err := GetAttributeTypes(db)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Create context for transaction
@@ -82,7 +90,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 	// Get a Tx for making transaction requests.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Defer transaction rollback in case anything fails.
 	defer tx.Rollback()
@@ -94,12 +102,12 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN,
 		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Get certificate ID from INSERT
 	certificateId, err := result.LastInsertId()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// Associate key usages with certificate
 	for _, keyUsage := range cert.KeyUsages {
@@ -107,16 +115,16 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 		var keyUsageId int
 		err = tx.QueryRow("SELECT id FROM KeyUsage WHERE name = ?", keyUsage).Scan(&keyUsageId)
 		if err == sql.ErrNoRows {
-			return fmt.Errorf("invalid key usage: %s", keyUsage)
+			return 0, fmt.Errorf("invalid key usage: %s", keyUsage)
 		}
 		if err != nil {
-			return fmt.Errorf("failed to query key usage ID: %w", err)
+			return 0, fmt.Errorf("failed to query key usage ID: %w", err)
 		}
 		// Insert
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateKeyUsage (certificate_id, keyUsage_id) VALUE (?, ?)",
 			certificateId, keyUsageId)
 		if err != nil {
-			return fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
+			return 0, fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
 		}
 	}
 
@@ -129,7 +137,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
 			"VALUE (?, ?, ?, ?)", certificateId, Issuer, attribute.Oid, attribute.Value)
 		if err != nil {
-			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Issuer, err)
+			return 0, fmt.Errorf("failed to insert %s CertificateAttribute: %w", Issuer, err)
 		}
 	}
 
@@ -142,7 +150,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
 			"VALUE (?, ?, ?, ?)", certificateId, Subject, attribute.Oid, attribute.Value)
 		if err != nil {
-			return fmt.Errorf("failed to insert %s CertificateAttribute: %w", Subject, err)
+			return 0, fmt.Errorf("failed to insert %s CertificateAttribute: %w", Subject, err)
 		}
 	}
 
@@ -171,28 +179,28 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 			result, err = tx.ExecContext(ctx, "INSERT INTO SubjectAlternateName (name, subjectAlternateNameType_id) "+
 				"VALUE (?, ?)", certSanValue, sanTypeId)
 			if err != nil {
-				return err
+				return 0, err
 			}
 			// Get SubjectAlternateName ID from INSERT
 			sanId, err := result.LastInsertId()
 			if err != nil {
-				return err
+				return 0, err
 			}
 			// Associate SAN ID with certificate
 			_, err = tx.ExecContext(ctx, "INSERT INTO CertificateSAN (certificate_id, subjectAlternateName_id) "+
 				"VALUE (?, ?)", certificateId, sanId)
 			if err != nil {
-				return fmt.Errorf("failed to insert CertificateSAN: %w", err)
+				return 0, fmt.Errorf("failed to insert CertificateSAN: %w", err)
 			}
 		}
 	}
 
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit StoreCertificate transaction: %w", err)
+		return 0, fmt.Errorf("failed to commit StoreCertificate transaction: %w", err)
 	}
 
-	return err
+	return certificateId, err
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
@@ -369,6 +377,36 @@ func GetAttributeTypes(db *sql.DB) ([]AttributeType, error) {
 		return attributeTypes, err
 	}
 	return attributeTypes, nil
+}
+
+// GetCertificateAttributes fetches the list of attributes for the certificate ID and the attribute type provided.
+// Error is not nil if the ID is invalid or if the database query fails.
+func GetCertificateAttributes(db *sql.DB, certificateId int64, attributeType string) ([]Attribute, error) {
+
+	rows, err := db.Query("SELECT oid, value FROM CertificateAttribute attr "+
+		"WHERE certificate_id = ? AND attr.type = ?", certificateId, attributeType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// An Attribute slice to hold data from returned rows.
+	var attributes []Attribute
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var attribute Attribute
+		if err := rows.Scan(&attribute.Oid, &attribute.Value); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return attributes, err
+		}
+		attributes = append(attributes, attribute)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return attributes, err
+	}
+	return attributes, nil
 }
 
 func knownOid(oid string, attributeTypes []AttributeType) bool {
