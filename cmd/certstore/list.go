@@ -6,9 +6,8 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"l"},
-	Short:   "List",
+	Use:   "list",
+	Short: "List",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("TODO: display the list of certificates")
 	},

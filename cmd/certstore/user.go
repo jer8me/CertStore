@@ -9,9 +9,8 @@ import (
 var (
 	// Command
 	userCmd = &cobra.Command{
-		Use:     "user",
-		Aliases: []string{"u"},
-		Short:   "User information",
+		Use:   "user",
+		Short: "User information",
 		Run: func(cmd *cobra.Command, args []string) {
 			currentUser, err := user.Current()
 			if err != nil {
