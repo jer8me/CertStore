@@ -7,6 +7,52 @@ import (
 	"log"
 )
 
+func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
+	cert := &Certificate{Id: certificateId}
+	var publicKeyAlgorithmId int
+	var signatureAlgorithmId int
+	// Fetch Certificate object
+	err := db.QueryRow("SELECT publicKey, publicKeyAlgorithm_id, version, serialNumber, subject, issuer, notBefore, "+
+		"notAfter, signature, signatureAlgorithm_id, isCa, rawContent FROM Certificate WHERE id = ?", certificateId).
+		Scan(&cert.PublicKey, &publicKeyAlgorithmId, &cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN,
+			&cert.NotBefore, &cert.NotAfter, &cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("invalid certificate ID: %d", certificateId)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
+	}
+	// Fetch Public Key Algorithm by ID
+	cert.PublicKeyAlgorithm, err = GetPublicKeyAlgorithmName(db, publicKeyAlgorithmId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query public key algorithm name: %w", err)
+	}
+
+	// Fetch Signature Algorithm by ID
+	cert.SignatureAlgorithm, err = GetSignatureAlgorithmName(db, signatureAlgorithmId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query signature algorithm name: %w", err)
+	}
+
+	// Fetch Subject Attributes for this certificate ID
+
+	// Fetch Issuer Attributes for this certificate ID
+
+	// Fetch Key Usages for this certificate ID
+	cert.KeyUsages, err = GetCertificateKeyUsages(db, certificateId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query key usages: %w", err)
+	}
+
+	// Fetch SANs for this certificate ID
+	cert.SANs, err = GetCertificateSANs(db, certificateId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query SANs: %w", err)
+	}
+
+	return cert, nil
+}
+
 func StoreCertificate(db *sql.DB, cert *Certificate) error {
 
 	// Get public key algorithm ID for string
@@ -150,7 +196,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) error {
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
-// Error is not nil if the string is invalid or if the database query fails
+// Error is not nil if the string is invalid or if the database query fails.
 func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
 	var id int
 	err := db.QueryRow("SELECT id FROM PublicKeyAlgorithm WHERE name = ?", publicKeyAlgorithm).Scan(&id)
@@ -163,8 +209,22 @@ func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error)
 	return id, nil
 }
 
+// GetPublicKeyAlgorithmName looks up the name for a PublicKeyAlgorithm based on its ID.
+// Error is not nil if the ID is invalid or if the database query fails.
+func GetPublicKeyAlgorithmName(db *sql.DB, publicKeyAlgorithmId int) (string, error) {
+	var name string
+	err := db.QueryRow("SELECT name FROM PublicKeyAlgorithm WHERE id = ?", publicKeyAlgorithmId).Scan(&name)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("invalid public key algorithm ID: %d", publicKeyAlgorithmId)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to query public key algorithm ID: %w", err)
+	}
+	return name, nil
+}
+
 // GetSignatureAlgorithmId looks up the ID for a SignatureAlgorithm string
-// Error is not nil if the string is invalid or if the database query fails
+// Error is not nil if the string is invalid or if the database query fails.
 func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error) {
 	var id int
 	err := db.QueryRow("SELECT id FROM SignatureAlgorithm WHERE name = ?", signatureAlgorithm).Scan(&id)
@@ -175,6 +235,51 @@ func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error)
 		return 0, fmt.Errorf("failed to query signature algorithm ID: %w", err)
 	}
 	return id, nil
+}
+
+// GetSignatureAlgorithmName looks up the name for a SignatureAlgorithm based on its ID.
+// Error is not nil if the ID is invalid or if the database query fails.
+func GetSignatureAlgorithmName(db *sql.DB, signatureAlgorithmId int) (string, error) {
+	var name string
+	err := db.QueryRow("SELECT name FROM SignatureAlgorithm WHERE id = ?", signatureAlgorithmId).Scan(&name)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("invalid signature algorithm ID: %d", signatureAlgorithmId)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to query signature algorithm ID: %w", err)
+	}
+	return name, nil
+}
+
+// GetCertificateKeyUsages looks up the key usage names for a certificate ID.
+// Error is not nil if the ID is invalid or if the database query fails.
+func GetCertificateKeyUsages(db *sql.DB, certificateId int64) ([]string, error) {
+
+	rows, err := db.Query("SELECT name FROM CertificateKeyUsage cks "+
+		"INNER JOIN KeyUsage ku ON cks.keyUsage_id = ku.id "+
+		"WHERE certificate_id = ?", certificateId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// A slice of strings to hold data from returned rows.
+	var keyUsages []string
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var keyUsage string
+		if err := rows.Scan(&keyUsage); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return keyUsages, err
+		}
+		keyUsages = append(keyUsages, keyUsage)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return keyUsages, err
+	}
+	return keyUsages, nil
 }
 
 // GetSANTypes returns a slice of SAN type as stored in the database
@@ -203,6 +308,40 @@ func GetSANTypes(db *sql.DB) ([]SANType, error) {
 		return sanTypes, err
 	}
 	return sanTypes, nil
+}
+
+// GetCertificateSANs looks up the subject alternate names (SANs) for a certificate ID.
+// Error is not nil if the ID is invalid or if the database query fails.
+func GetCertificateSANs(db *sql.DB, certificateId int64) (map[string][]string, error) {
+
+	rows, err := db.Query("SELECT san.name sanName, sanType.name sanType FROM CertificateSan cs "+
+		"INNER JOIN SubjectAlternateName san ON cs.subjectAlternateName_id = san.id "+
+		"INNER JOIN SubjectAlternateNameType sanType ON san.subjectAlternateNameType_id = sanType.id "+
+		"WHERE certificate_id = ?", certificateId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// A map of string slices to hold data from returned rows.
+	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
+	// The value is a slice of strings containing the SANs for the type.
+	sans := make(map[string][]string)
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var sanName, sanType string
+		if err := rows.Scan(&sanName, &sanType); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return sans, err
+		}
+		sans[sanType] = append(sans[sanType], sanName)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return sans, err
+	}
+	return sans, nil
 }
 
 func GetAttributeTypes(db *sql.DB) ([]AttributeType, error) {

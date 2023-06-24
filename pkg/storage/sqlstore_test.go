@@ -29,6 +29,19 @@ func openMySql(t *testing.T) *sql.DB {
 	return db
 }
 
+func TestGetCertificate(t *testing.T) {
+
+	// Connect to database
+	db := openMySql(t)
+	defer db.Close()
+
+	cert, err := GetCertificate(db, 1)
+	if err != nil {
+		require.NoError(t, err, "failed to get certificate")
+	}
+	assert.NotNil(t, cert.Signature)
+}
+
 func TestStoreCertificate(t *testing.T) {
 
 	// Read certificate
@@ -86,6 +99,37 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 	}
 }
 
+func TestGetPublicKeyAlgorithmName(t *testing.T) {
+
+	// Connect to database
+	db := openMySql(t)
+	defer db.Close()
+
+	tests := []struct {
+		name                 string
+		publicKeyAlgorithmId int
+		want                 string
+		wantErr              assert.ErrorAssertionFunc
+	}{
+		{"TestRSAPublicKeyAlgorithm", 1, "RSA", assert.NoError},
+		{"TestDSAPublicKeyAlgorithm", 2, "DSA", assert.NoError},
+		{"TestECDSAPublicKeyAlgorithm", 3, "ECDSA", assert.NoError},
+		{"TestEd25519PublicKeyAlgorithm", 4, "Ed25519", assert.NoError},
+		{"TestInvalidPublicKeyAlgorithm", 5, "", assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetPublicKeyAlgorithmName(db, tt.publicKeyAlgorithmId)
+			if !tt.wantErr(t, err, fmt.Sprintf("GetPublicKeyAlgorithmName(%v)", tt.publicKeyAlgorithmId)) {
+				return
+			}
+			if err == nil {
+				assert.Equalf(t, tt.want, got, "GetPublicKeyAlgorithmName(%v)", tt.publicKeyAlgorithmId)
+			}
+		})
+	}
+}
+
 func TestGetSignatureAlgorithmId(t *testing.T) {
 
 	// Connect to database
@@ -128,6 +172,35 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 			if err == nil {
 				assert.Positive(t, got)
 			}
+		})
+	}
+}
+
+func TestGetSignatureAlgorithmName(t *testing.T) {
+
+	// Connect to database
+	db := openMySql(t)
+	defer db.Close()
+
+	tests := []struct {
+		name                 string
+		signatureAlgorithmId int
+		want                 string
+		wantErr              assert.ErrorAssertionFunc
+	}{
+		{"TestMD2RSASignatureAlgorithm", 1, "MD2-RSA", assert.NoError},
+		{"TestSHA256RSASignatureAlgorithm", 4, "SHA256-RSA", assert.NoError},
+		{"TestSHA512RSASignatureAlgorithm", 6, "SHA512-RSA", assert.NoError},
+		{"TestEd25519SignatureAlgorithm", 16, "Ed25519", assert.NoError},
+		{"TestInvalidSignatureAlgorithm", 17, "", assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetSignatureAlgorithmName(db, tt.signatureAlgorithmId)
+			if !tt.wantErr(t, err, fmt.Sprintf("GetSignatureAlgorithmName(%v)", tt.signatureAlgorithmId)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "GetSignatureAlgorithmName(%v)", tt.signatureAlgorithmId)
 		})
 	}
 }
