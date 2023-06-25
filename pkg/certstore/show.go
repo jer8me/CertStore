@@ -1,6 +1,8 @@
 package certstore
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"io"
@@ -9,6 +11,36 @@ import (
 	"strings"
 )
 
+const columnNum = 16
+const separator = ":"
+
+// PrintHex prints a slice of bytes in am hexadecimal format, separated by colons.
+// The indent parameter specifies the numbers of leading spaces to print for each line.
+func PrintHex(w io.Writer, b []byte, indent int) {
+	spaces := strings.Repeat(" ", indent)
+	hexWriter := hex.NewEncoder(w)
+	for i := range b {
+		var buf bytes.Buffer
+		// Check if this is a new line
+		if (i % columnNum) == 0 {
+			if i > 0 {
+				// Print a new line first if this is not the first line
+				buf.WriteRune('\n')
+			}
+			// Print leading spaces
+			buf.WriteString(spaces)
+		} else {
+			// Print separator
+			buf.WriteString(separator)
+		}
+		// Print buffer
+		w.Write(buf.Bytes())
+		// Print 1 byte
+		hexWriter.Write(b[i : i+1])
+	}
+}
+
+// PrintCertificate prints a certificate in a human-readable format
 func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintln(w, "Certificate:")
 	fmt.Fprintf(w, "  Version: %d\n", cert.Version)
@@ -21,6 +53,9 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintf(w, "  Subject: %v\n", cert.Subject)
 	fmt.Fprintf(w, "  Subject Public Key Info:\n")
 	fmt.Fprintf(w, "    Public Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
+	fmt.Fprintf(w, "      Public Key:\n")
+	PrintHex(w, cert.PublicKey, 8)
+	fmt.Fprintln(w)
 	fmt.Fprintf(w, "  X509v3 Extensions:\n")
 	if len(cert.KeyUsages) > 0 {
 		fmt.Fprintf(w, "    X509v3 Key Usage: critical\n")
@@ -46,8 +81,10 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 		}
 		fmt.Fprintf(w, "\n")
 	}
-	// TODO: display PublicKey in human-friendly format
-	// TODO: display Signature in human-friendly format
+	fmt.Fprintf(w, "  Signature Algorithm: %s\n", cert.SignatureAlgorithm)
+	fmt.Fprintf(w, "  Signature:\n")
+	PrintHex(w, cert.Signature, 4)
+	fmt.Fprintln(w)
 }
 
 func ShowCertificate(certificateId int64, userName, userPassword, dbName string) error {

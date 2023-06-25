@@ -19,6 +19,7 @@ var (
 )
 
 var storeCmd = &cobra.Command{
+	Use:   "store cert_path [...cert_path]",
 	Args:  cobra.MinimumNArgs(1),
 	Short: "Store a certificate",
 	Run: func(cmd *cobra.Command, args []string) {
