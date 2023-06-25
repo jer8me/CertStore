@@ -12,9 +12,18 @@ CertStore project
 go build
 ```
 
-## Run ##
+## Using CertStore ##
+
+### Storing a certificate ###
 
 ```bash
 export DB_PASSWORD=<your_db_password>
-.\CertStore test --dbpass $DB_PASSWORD
+.\CertStore store certificate.pem --dbpass $DB_PASSWORD
+```
+
+### Displaying a certificate ###
+
+```bash
+export DB_PASSWORD=<your_db_password>
+.\CertStore show --id 1 --dbpass $DB_PASSWORD
 ```
