@@ -23,5 +23,5 @@ var (
 )
 
 func init() {
-	cmd.AddCommand(userCmd)
+	rootCmd.AddCommand(userCmd)
 }

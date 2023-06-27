@@ -6,18 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	defaultUser = "root"
-	defaultDB   = "certstore"
-)
-
-var (
-	// Database connection parameters
-	userName     string
-	userPassword string
-	dbName       string
-)
-
 var storeCmd = &cobra.Command{
 	Use:   "store cert_path [...cert_path]",
 	Args:  cobra.MinimumNArgs(1),
@@ -35,9 +23,5 @@ var storeCmd = &cobra.Command{
 }
 
 func init() {
-	storeCmd.Flags().StringVar(&userName, "dbuser", defaultUser, "Database Username")
-	storeCmd.Flags().StringVar(&userPassword, "dbpass", "", "Database Password")
-	storeCmd.Flags().StringVar(&dbName, "dbname", defaultDB, "Database Name")
-	storeCmd.MarkFlagRequired("dbpass")
-	cmd.AddCommand(storeCmd)
+	AddDBCommand(storeCmd)
 }

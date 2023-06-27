@@ -25,9 +25,5 @@ var (
 func init() {
 	showCmd.Flags().Int64Var(&certificateId, "id", 0, "Certificate Id")
 	showCmd.MarkFlagRequired("id")
-	showCmd.Flags().StringVar(&userName, "dbuser", defaultUser, "Database Username")
-	showCmd.Flags().StringVar(&userPassword, "dbpass", "", "Database Password")
-	showCmd.Flags().StringVar(&dbName, "dbname", defaultDB, "Database Name")
-	showCmd.MarkFlagRequired("dbpass")
-	cmd.AddCommand(showCmd)
+	AddDBCommand(showCmd)
 }
