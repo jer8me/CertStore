@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 )
@@ -95,17 +97,31 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 	// Defer transaction rollback in case anything fails.
 	defer tx.Rollback()
 
+	// Compute SHA-256 Fingerprint
+	sha256Sum := sha256.Sum256(cert.RawContent)
+	sha256Fingerprint := hex.EncodeToString(sha256Sum[:])
+
+	// Check if this certificate already exists in the database
+	var certificateId int64
+	err = tx.QueryRow("SELECT id FROM Certificate WHERE sha256Fingerprint = ?", sha256Fingerprint).Scan(&certificateId)
+	if err == nil {
+		// Found matching certificate: return id
+		return certificateId, nil
+	} else if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to query certificate by SHA-256 fingerprint: %w", err)
+	}
+
 	// Create a new row in the album_order table.
 	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
-		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent) "+
-		"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		cert.PublicKey, publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN,
-		cert.NotBefore, cert.NotAfter, cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent)
+		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent, "+
+		"sha256Fingerprint) VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", cert.PublicKey, publicKeyAlgorithmId,
+		cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, cert.NotBefore, cert.NotAfter,
+		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint)
 	if err != nil {
 		return 0, err
 	}
 	// Get certificate ID from INSERT
-	certificateId, err := result.LastInsertId()
+	certificateId, err = result.LastInsertId()
 	if err != nil {
 		return 0, err
 	}

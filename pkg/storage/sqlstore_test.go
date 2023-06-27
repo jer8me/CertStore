@@ -1,9 +1,11 @@
-package storage
+package storage_test
 
 import (
 	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/certstore"
+	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
@@ -22,7 +24,7 @@ func openMySql(t *testing.T) *sql.DB {
 	dbName := os.Getenv("DB_NAME")
 	require.NotEmpty(t, dbName, "DB_NAME must be defined")
 
-	db, err := OpenMySqlDB(username, password, dbName)
+	db, err := storage.OpenMySqlDB(username, password, dbName)
 	if err != nil {
 		require.NoError(t, err, "failed to open database '%s' for user '%s'", dbName, username)
 	}
@@ -35,7 +37,10 @@ func TestGetCertificate(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	cert, err := GetCertificate(db, 1)
+	certificateId, err := certstore.StoreCertificate(db, certPath("champlain.crt"))
+	require.NoError(t, err, "failed to store certificate")
+
+	cert, err := storage.GetCertificate(db, certificateId)
 	if err != nil {
 		require.NoError(t, err, "failed to get certificate")
 	}
@@ -50,7 +55,7 @@ func TestStoreCertificate(t *testing.T) {
 		require.NoError(t, err, "failed to read certificate")
 	}
 	// Transform x509 certificate to certificate DB model
-	certificate, err := ToCertificate(x509cert)
+	certificate, err := storage.ToCertificate(x509cert)
 	if err != nil {
 		require.NoError(t, err, "failed to transform x509 certificate")
 	}
@@ -59,7 +64,7 @@ func TestStoreCertificate(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	certificateId, err := StoreCertificate(db, certificate)
+	certificateId, err := storage.StoreCertificate(db, certificate)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}
@@ -89,7 +94,7 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 			name = "Test" + tt.publicKeyAlgorithm + "PublicKeyAlgorithmId"
 		}
 		t.Run(name, func(t *testing.T) {
-			got, err := GetPublicKeyAlgorithmId(db, tt.publicKeyAlgorithm)
+			got, err := storage.GetPublicKeyAlgorithmId(db, tt.publicKeyAlgorithm)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetPublicKeyAlgorithmId(%s)", tt.publicKeyAlgorithm)) {
 				return
 			}
@@ -120,7 +125,7 @@ func TestGetPublicKeyAlgorithmName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetPublicKeyAlgorithmName(db, tt.publicKeyAlgorithmId)
+			got, err := storage.GetPublicKeyAlgorithmName(db, tt.publicKeyAlgorithmId)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetPublicKeyAlgorithmName(%v)", tt.publicKeyAlgorithmId)) {
 				return
 			}
@@ -166,7 +171,7 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 			name = "Test" + strings.ReplaceAll(tt.signatureAlgorithm, "-", "With") + "SignatureAlgorithmId"
 		}
 		t.Run(name, func(t *testing.T) {
-			got, err := GetSignatureAlgorithmId(db, tt.signatureAlgorithm)
+			got, err := storage.GetSignatureAlgorithmId(db, tt.signatureAlgorithm)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetSignatureAlgorithmId(%s)", tt.signatureAlgorithm)) {
 				return
 			}
@@ -197,7 +202,7 @@ func TestGetSignatureAlgorithmName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetSignatureAlgorithmName(db, tt.signatureAlgorithmId)
+			got, err := storage.GetSignatureAlgorithmName(db, tt.signatureAlgorithmId)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetSignatureAlgorithmName(%v)", tt.signatureAlgorithmId)) {
 				return
 			}
@@ -213,7 +218,7 @@ func TestGetSANTypes(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	sanTypes, err := GetSANTypes(db)
+	sanTypes, err := storage.GetSANTypes(db)
 	if err != nil {
 		require.NoError(t, err, "failed to get SAN types")
 	}
@@ -225,7 +230,7 @@ func TestGetSANTypes(t *testing.T) {
 		assert.False(t, slices.Contains(sanNames, sanType.Name), "duplicate SAN type name")
 		sanNames = append(sanNames, sanType.Name)
 	}
-	assert.Subset(t, sanNames, []string{DnsName, EmailAddress, IpAddress, URI})
+	assert.Subset(t, sanNames, []string{storage.DnsName, storage.EmailAddress, storage.IpAddress, storage.URI})
 }
 
 // TestGetAttributeTypes tests the general sanity of the data populated in the AttributeType table
@@ -235,7 +240,7 @@ func TestGetAttributeTypes(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	attributeTypes, err := GetAttributeTypes(db)
+	attributeTypes, err := storage.GetAttributeTypes(db)
 	if err != nil {
 		require.NoError(t, err, "failed to get attribute types")
 	}

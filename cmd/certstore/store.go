@@ -24,7 +24,7 @@ var storeCmd = &cobra.Command{
 	Short: "Store a certificate",
 	Run: func(cmd *cobra.Command, args []string) {
 		for _, certPath := range args {
-			certificateId, err := certstore.StoreCertificate(certPath, userName, userPassword, dbName)
+			certificateId, err := certstore.StoreCertificateMySql(certPath, userName, userPassword, dbName)
 			if err == nil {
 				fmt.Printf("Certificate %s successfully stored (certificate ID=%d)\n", certPath, certificateId)
 			} else {

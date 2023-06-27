@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS Certificate (
   signatureAlgorithm_id INT NOT NULL,
   isCa TINYINT(1) NOT NULL,    -- boolean: 0=false, 1=true
   rawContent BLOB NOT NULL,
+  sha256Fingerprint VARCHAR(64) NOT NULL,
   privateKey_id INT NULL,
   PRIMARY KEY (id ASC),
   INDEX (publicKeyAlgorithm_id ASC),

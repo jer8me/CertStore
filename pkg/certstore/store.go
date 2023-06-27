@@ -1,11 +1,12 @@
 package certstore
 
 import (
+	"database/sql"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/storage"
 )
 
-func StoreCertificate(certPath, userName, userPassword, dbName string) (int64, error) {
+func StoreCertificate(db *sql.DB, certPath string) (int64, error) {
 
 	// Read certificate file
 	x509cert, err := certificates.ParsePEMFile(certPath)
@@ -18,6 +19,11 @@ func StoreCertificate(certPath, userName, userPassword, dbName string) (int64, e
 		return 0, err
 	}
 
+	return storage.StoreCertificate(db, certificate)
+}
+
+func StoreCertificateMySql(certPath, userName, userPassword, dbName string) (int64, error) {
+
 	// Connect to database
 	db, err := storage.OpenMySqlDB(userName, userPassword, dbName)
 	if err != nil {
@@ -25,5 +31,5 @@ func StoreCertificate(certPath, userName, userPassword, dbName string) (int64, e
 	}
 	defer db.Close()
 
-	return storage.StoreCertificate(db, certificate)
+	return StoreCertificate(db, certPath)
 }

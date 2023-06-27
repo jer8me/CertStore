@@ -1,4 +1,4 @@
-package storage
+package storage_test
 
 import (
 	"crypto/x509"
@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -45,7 +46,7 @@ func TestGetKeyUsages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCertificate := &x509.Certificate{KeyUsage: tt.keyUsage}
-			assert.Equalf(t, tt.want, GetKeyUsages(mockCertificate), "GetKeyUsages(%v)", tt.keyUsage)
+			assert.Equalf(t, tt.want, storage.GetKeyUsages(mockCertificate), "GetKeyUsages(%v)", tt.keyUsage)
 		})
 	}
 }
@@ -65,7 +66,7 @@ func TestCertificateKeyUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			x509certificate, err := certificates.ParsePEMFile(tt.filename)
 			require.NoError(t, err, "failed to parse certificate")
-			assert.Equalf(t, tt.want, GetKeyUsages(x509certificate), "GetKeyUsages(%v)", tt.filename)
+			assert.Equalf(t, tt.want, storage.GetKeyUsages(x509certificate), "GetKeyUsages(%v)", tt.filename)
 		})
 	}
 }
@@ -79,7 +80,7 @@ func TestToCertificate(t *testing.T) {
 	tests := []struct {
 		name    string
 		cert    *x509.Certificate
-		want    *Certificate
+		want    *storage.Certificate
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{"TestValidCertificate", validCert, nil, assert.NoError},
@@ -87,7 +88,7 @@ func TestToCertificate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ToCertificate(tt.cert)
+			got, err := storage.ToCertificate(tt.cert)
 			if !tt.wantErr(t, err, fmt.Sprintf("ToCertificate(%v)", tt.cert)) {
 				return
 			}
@@ -111,15 +112,15 @@ func TestGetSANs(t *testing.T) {
 
 	mockCertificate := &x509.Certificate{DNSNames: dnsNames, EmailAddresses: emailAddresses,
 		IPAddresses: ipAddresses, URIs: uris}
-	sans := GetSANs(mockCertificate)
-	assert.Contains(t, sans, DnsName)
-	assert.Equal(t, sans[DnsName], dnsNames)
-	assert.Contains(t, sans, EmailAddress)
-	assert.Equal(t, sans[EmailAddress], emailAddresses)
-	assert.Contains(t, sans, IpAddress)
-	assert.Equal(t, sans[IpAddress], []string{"208.115.107.132", "2001:db8::68"})
-	assert.Contains(t, sans, URI)
-	assert.Equal(t, sans[URI], testUrls)
+	sans := storage.GetSANs(mockCertificate)
+	assert.Contains(t, sans, storage.DnsName)
+	assert.Equal(t, sans[storage.DnsName], dnsNames)
+	assert.Contains(t, sans, storage.EmailAddress)
+	assert.Equal(t, sans[storage.EmailAddress], emailAddresses)
+	assert.Contains(t, sans, storage.IpAddress)
+	assert.Equal(t, sans[storage.IpAddress], []string{"208.115.107.132", "2001:db8::68"})
+	assert.Contains(t, sans, storage.URI)
+	assert.Equal(t, sans[storage.URI], testUrls)
 }
 
 // TestGetAttributes tests that a pkix Name structure is correctly parsed into a slice of attributes
@@ -149,11 +150,11 @@ func TestGetAttributes(t *testing.T) {
 	assert.Equal(t, []string{organizationName}, name.Organization, "invalid organization name")
 	assert.Equal(t, commonName, name.CommonName, "invalid common name")
 
-	parsedAttributes := GetAttributes(name)
+	parsedAttributes := storage.GetAttributes(name)
 	assert.Len(t, parsedAttributes, 5, "invalid number of attributes")
-	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.6", Value: countryName})
-	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.8", Value: stateOrProvinceName})
-	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.7", Value: localityName})
-	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.10", Value: organizationName})
-	assert.Contains(t, parsedAttributes, Attribute{Oid: "2.5.4.3", Value: commonName})
+	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.6", Value: countryName})
+	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.8", Value: stateOrProvinceName})
+	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.7", Value: localityName})
+	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.10", Value: organizationName})
+	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.3", Value: commonName})
 }
