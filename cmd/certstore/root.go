@@ -3,22 +3,13 @@ package certstore
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 )
 
 const version = "0.0.1"
 
-const (
-	defaultUser = "root"
-	defaultDB   = "certstore"
-)
-
-var (
-	// Database connection parameters
-	userName     string
-	userPassword string
-	dbName       string
-)
+var viperCfg = viper.New()
 
 var rootCmd = &cobra.Command{
 	Use:     "CertStore",
@@ -31,12 +22,4 @@ func Execute() {
 		fmt.Fprintf(os.Stderr, "Error while executing CLI: %s", err)
 		os.Exit(1)
 	}
-}
-
-func AddDBCommand(subcmd *cobra.Command) {
-	subcmd.Flags().StringVar(&userName, "dbuser", defaultUser, "Database Username")
-	subcmd.Flags().StringVar(&userPassword, "dbpass", "", "Database Password")
-	subcmd.Flags().StringVar(&dbName, "dbname", defaultDB, "Database Name")
-	subcmd.MarkFlagRequired("dbpass")
-	rootCmd.AddCommand(subcmd)
 }

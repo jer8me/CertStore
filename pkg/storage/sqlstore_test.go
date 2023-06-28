@@ -3,8 +3,8 @@ package storage_test
 import (
 	"database/sql"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/certstore"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,18 +17,20 @@ import (
 // Helper function to open a database connection
 func openMySql(t *testing.T) *sql.DB {
 	// Connect to database
-	username := os.Getenv("DB_USERNAME")
-	require.NotEmpty(t, username, "DB_USERNAME must be defined")
-	password := os.Getenv("DB_PASSWORD")
-	require.NotEmpty(t, password, "DB_PASSWORD must be defined")
-	dbName := os.Getenv("DB_NAME")
-	require.NotEmpty(t, dbName, "DB_NAME must be defined")
+	mysqlCfg := mysql.NewConfig()
+	mysqlCfg.User = os.Getenv("DB_USERNAME")
+	require.NotEmpty(t, mysqlCfg.User, "DB_USERNAME must be non-empty")
+	mysqlCfg.Passwd = os.Getenv("DB_PASSWORD")
+	require.NotEmpty(t, mysqlCfg.Passwd, "DB_PASSWORD must be non-empty")
+	mysqlCfg.DBName = os.Getenv("DB_NAME")
+	require.NotEmpty(t, mysqlCfg.DBName, "DB_NAME must be non-empty")
+	mysqlCfg.ParseTime = true
 
-	db, err := storage.OpenMySqlDB(username, password, dbName)
-	if err != nil {
-		require.NoError(t, err, "failed to open database '%s' for user '%s'", dbName, username)
-	}
-	return db
+	connector, err := mysql.NewConnector(mysqlCfg)
+	require.NoError(t, err, "failed to create database connector "+
+		"(db=%s, user=%s)", mysqlCfg.DBName, mysqlCfg.User)
+
+	return sql.OpenDB(connector)
 }
 
 func TestGetCertificate(t *testing.T) {
@@ -37,7 +39,12 @@ func TestGetCertificate(t *testing.T) {
 	db := openMySql(t)
 	defer db.Close()
 
-	certificateId, err := certstore.StoreCertificate(db, certPath("champlain.crt"))
+	// Read certificate file
+	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	require.NoError(t, err, "failed to read certificate file")
+
+	// Store certificate in database
+	certificateId, err := storage.StoreX509Certificate(db, x509cert)
 	require.NoError(t, err, "failed to store certificate")
 
 	cert, err := storage.GetCertificate(db, certificateId)

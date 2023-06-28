@@ -1,4 +1,4 @@
-package certstore
+package certificates
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -85,23 +84,4 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintf(w, "  Signature:\n")
 	PrintHex(w, cert.Signature, 4)
 	fmt.Fprintln(w)
-}
-
-func ShowCertificate(certificateId int64, userName, userPassword, dbName string) error {
-
-	// Connect to database
-	db, err := storage.OpenMySqlDB(userName, userPassword, dbName)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	// Fetch certificate
-	cert, err := storage.GetCertificate(db, certificateId)
-	if err != nil {
-		return err
-	}
-	PrintCertificate(os.Stdout, cert)
-
-	return nil
 }

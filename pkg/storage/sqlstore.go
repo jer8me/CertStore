@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -217,6 +218,16 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 	}
 
 	return certificateId, err
+}
+
+// StoreX509Certificate stores an X.509 certificate structure into the database
+func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error) {
+	// Transform x509 certificate to certificate DB model
+	certificate, err := ToCertificate(x509cert)
+	if err != nil {
+		return 0, err
+	}
+	return StoreCertificate(db, certificate)
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string

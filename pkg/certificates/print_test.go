@@ -1,4 +1,4 @@
-package certstore
+package certificates_test
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ func TestPrintHex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			PrintHex(w, tt.args.b, tt.args.indent)
+			certificates.PrintHex(w, tt.args.b, tt.args.indent)
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("PrintHex() = %v, want %v", gotW, tt.wantW)
 			}
@@ -51,6 +51,6 @@ func TestPrintCertificate(t *testing.T) {
 	require.NoError(t, err, "failed to convert certificate")
 
 	var sb strings.Builder
-	PrintCertificate(&sb, certificate)
+	certificates.PrintCertificate(&sb, certificate)
 	assert.Len(t, sb.String(), 2590, "invalid certificate printed content")
 }

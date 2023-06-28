@@ -2,8 +2,10 @@ package certstore
 
 import (
 	"fmt"
-	"github.com/jer8me/CertStore/pkg/certstore"
+	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 var certificateId int64
@@ -13,17 +15,31 @@ var (
 	showCmd = &cobra.Command{
 		Use:   "show",
 		Short: "Show a certificate",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := certstore.ShowCertificate(certificateId, userName, userPassword, dbName)
-			if err != nil {
-				fmt.Printf("Failed to retrieve certificate: %v\n", err)
-			}
-		},
+		RunE:  showCertificate,
 	}
 )
 
+func showCertificate(cmd *cobra.Command, args []string) error {
+	db, err := openMySqlDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Fetch certificate
+	cert, err := storage.GetCertificate(db, certificateId)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
+		os.Exit(1)
+	}
+	certificates.PrintCertificate(os.Stdout, cert)
+
+	return nil
+}
+
 func init() {
-	showCmd.Flags().Int64Var(&certificateId, "id", 0, "Certificate Id")
+	showCmd.Flags().Int64VarP(&certificateId, "id", "i", 0, "Certificate Id")
 	showCmd.MarkFlagRequired("id")
-	AddDBCommand(showCmd)
+	addMySqlFlags(showCmd)
+	rootCmd.AddCommand(showCmd)
 }
