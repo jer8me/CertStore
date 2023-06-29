@@ -64,6 +64,37 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	return cert, nil
 }
 
+func GetCertificates(db *sql.DB) ([]*Certificate, error) {
+	rows, err := db.Query("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, " +
+		"c.notAfter, c.isCa FROM Certificate c " +
+		"INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// A map of string slices to hold data from returned rows.
+	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
+	// The value is a slice of strings containing the SANs for the type.
+	var certificates []*Certificate
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		cert := &Certificate{}
+		if err := rows.Scan(&cert.Id, &cert.PublicKeyAlgorithm, &cert.Version, &cert.SerialNumber,
+			&cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter, &cert.IsCA); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return certificates, err
+		}
+		certificates = append(certificates, cert)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return certificates, err
+	}
+	return certificates, nil
+}
+
 func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 
 	// Get public key algorithm ID for string

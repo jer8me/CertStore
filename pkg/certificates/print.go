@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 )
 
 const columnNum = 16
@@ -84,4 +85,23 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintf(w, "  Signature:\n")
 	PrintHex(w, cert.Signature, 4)
 	fmt.Fprintln(w)
+}
+
+func PrintCertificates(w io.Writer, certs []*storage.Certificate) {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tPUBLIC KEY\tVERSION\tSERIAL NUMBER\tSUBJECT\tISSUER\tNOT BEFORE\tNOT AFTER\tIS CA")
+	for _, cert := range certs {
+		// Print timestamps as simple dates
+		notBefore := cert.NotBefore.Format("Jan-02-2006")
+		notAfter := cert.NotAfter.Format("Jan-02-2006")
+		var isCA string
+		if cert.IsCA {
+			isCA = "Y"
+		} else {
+			isCA = "N"
+		}
+		fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n", cert.Id, cert.PublicKeyAlgorithm, cert.Version,
+			cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, notBefore, notAfter, isCA)
+	}
+	tw.Flush()
 }
