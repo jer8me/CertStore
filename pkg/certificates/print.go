@@ -2,6 +2,11 @@ package certificates
 
 import (
 	"bytes"
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/storage"
@@ -40,6 +45,43 @@ func PrintHex(w io.Writer, b []byte, indent int) {
 	}
 }
 
+// PrintPublicKey prints the components of a public key based on the key type
+func PrintPublicKey(w io.Writer, b []byte, indent int) {
+	spaces := strings.Repeat(" ", indent)
+	pub, _ := x509.ParsePKIXPublicKey(b)
+	switch pub := pub.(type) {
+	case *rsa.PublicKey:
+		modulusBytes := pub.N.Bytes()
+		fmt.Fprintf(w, "%sRSA Public-Key: (%d bit)\n", spaces, len(modulusBytes)*8)
+		fmt.Fprintf(w, "%sModulus:\n", spaces)
+		PrintHex(w, modulusBytes, indent+2)
+		fmt.Fprintf(w, "\n%sExponent: %d", spaces, pub.E)
+	case *dsa.PublicKey:
+		fmt.Fprintf(w, "%sY:\n", spaces)
+		PrintHex(w, pub.Y.Bytes(), indent+2)
+		fmt.Fprintf(w, "\n%sP:\n", spaces)
+		PrintHex(w, pub.P.Bytes(), indent+2)
+		fmt.Fprintf(w, "\n%sQ:\n", spaces)
+		PrintHex(w, pub.Q.Bytes(), indent+2)
+		fmt.Fprintf(w, "\n%sG:\n", spaces)
+		PrintHex(w, pub.G.Bytes(), indent+2)
+	case *ecdsa.PublicKey:
+		fmt.Fprintf(w, "%sX:\n", spaces)
+		PrintHex(w, pub.X.Bytes(), indent+2)
+		fmt.Fprintf(w, "\n%sY:\n", spaces)
+		PrintHex(w, pub.Y.Bytes(), indent+2)
+		fmt.Fprintf(w, "\n%sNIST CURVE: %s", spaces, pub.Curve.Params().Name)
+	case ed25519.PublicKey:
+		fmt.Fprintf(w, "%sED25519 Public-Key:\n", spaces)
+		PrintHex(w, pub, indent+2)
+	default:
+		// Default format
+		fmt.Fprintf(w, "%sPublic-Key:\n", spaces)
+		PrintHex(w, b, indent+2)
+	}
+	fmt.Fprintln(w)
+}
+
 // PrintCertificate prints a certificate in a human-readable format
 func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintln(w, "Certificate:")
@@ -53,9 +95,7 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintf(w, "  Subject: %v\n", cert.Subject)
 	fmt.Fprintf(w, "  Subject Public Key Info:\n")
 	fmt.Fprintf(w, "    Public Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
-	fmt.Fprintf(w, "      Public Key:\n")
-	PrintHex(w, cert.PublicKey, 8)
-	fmt.Fprintln(w)
+	PrintPublicKey(w, cert.PublicKey, 6)
 	fmt.Fprintf(w, "  X509v3 Extensions:\n")
 	if len(cert.KeyUsages) > 0 {
 		fmt.Fprintf(w, "    X509v3 Key Usage: critical\n")
