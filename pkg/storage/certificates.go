@@ -67,13 +67,9 @@ const (
 )
 
 // ToCertificate converts a x509 certificate into a certificate database model
-func ToCertificate(x509certificate *x509.Certificate) (*Certificate, error) {
-	publicKey, err := x509.MarshalPKIXPublicKey(x509certificate.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	certificate := &Certificate{
-		PublicKey:          publicKey,
+func ToCertificate(x509certificate *x509.Certificate) *Certificate {
+	return &Certificate{
+		PublicKey:          x509certificate.RawSubjectPublicKeyInfo,
 		PublicKeyAlgorithm: x509certificate.PublicKeyAlgorithm.String(),
 		Version:            x509certificate.Version,
 		SerialNumber:       GetSerialNumber(x509certificate),
@@ -90,7 +86,6 @@ func ToCertificate(x509certificate *x509.Certificate) (*Certificate, error) {
 		IsCA:               x509certificate.IsCA,
 		RawContent:         x509certificate.Raw,
 	}
-	return certificate, nil
 }
 
 // GetSerialNumber returns the serial number of the certificate as a hex string

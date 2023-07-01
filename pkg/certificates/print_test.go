@@ -47,10 +47,9 @@ func TestPrintCertificate(t *testing.T) {
 	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
 	require.NoError(t, err, "failed to parse certificate")
 
-	certificate, err := storage.ToCertificate(x509cert)
-	require.NoError(t, err, "failed to convert certificate")
+	certificate := storage.ToCertificate(x509cert)
 
 	var sb strings.Builder
 	certificates.PrintCertificate(&sb, certificate)
-	assert.Len(t, sb.String(), 2590, "invalid certificate printed content")
+	assert.Len(t, sb.String(), 2504, "invalid certificate printed content")
 }

@@ -73,9 +73,8 @@ func TestCertificateKeyUsage(t *testing.T) {
 
 func TestToCertificate(t *testing.T) {
 
-	validCert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	certificate, err := certificates.ParsePEMFile(certPath("champlain.crt"))
 	require.NoError(t, err, "failed to parse certificate")
-	invalidCert := &x509.Certificate{PublicKey: []byte{0x10, 0x01}}
 
 	tests := []struct {
 		name    string
@@ -83,12 +82,11 @@ func TestToCertificate(t *testing.T) {
 		want    *storage.Certificate
 		wantErr assert.ErrorAssertionFunc
 	}{
-		{"TestValidCertificate", validCert, nil, assert.NoError},
-		{"TestInvalidCertificate", invalidCert, nil, assert.Error},
+		{"TestValidCertificate", certificate, nil, assert.NoError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := storage.ToCertificate(tt.cert)
+			got := storage.ToCertificate(tt.cert)
 			if !tt.wantErr(t, err, fmt.Sprintf("ToCertificate(%v)", tt.cert)) {
 				return
 			}

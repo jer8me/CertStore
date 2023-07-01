@@ -254,10 +254,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 // StoreX509Certificate stores an X.509 certificate structure into the database
 func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error) {
 	// Transform x509 certificate to certificate DB model
-	certificate, err := ToCertificate(x509cert)
-	if err != nil {
-		return 0, err
-	}
+	certificate := ToCertificate(x509cert)
 	return StoreCertificate(db, certificate)
 }
 
