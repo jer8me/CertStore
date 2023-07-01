@@ -10,15 +10,15 @@ import (
 
 var (
 	// Command
-	fetchCmd = &cobra.Command{
-		Use:   "fetch output_file",
+	saveCmd = &cobra.Command{
+		Use:   "save output_file",
 		Args:  cobra.ExactArgs(1),
-		Short: "Fetch a certificate and save it to a file",
-		RunE:  fetchCertificate,
+		Short: "Save a certificate to a file",
+		RunE:  saveCertificate,
 	}
 )
 
-func fetchCertificate(cmd *cobra.Command, args []string) error {
+func saveCertificate(cmd *cobra.Command, args []string) error {
 	db, err := openMySqlDB()
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func fetchCertificate(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addMySqlFlags(fetchCmd)
-	addIdFlag(fetchCmd, true)
-	rootCmd.AddCommand(fetchCmd)
+	addMySqlFlags(saveCmd)
+	addIdFlag(saveCmd, true)
+	rootCmd.AddCommand(saveCmd)
 }
