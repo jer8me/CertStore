@@ -20,16 +20,33 @@ go test ./...
 
 ## Using CertStore ##
 
-### Storing a certificate ###
-
+### Setup environment ###
 ```bash
-export DB_PASSWORD=<your_db_password>
-.\CertStore store certificate.pem --dbpass $DB_PASSWORD
+export DB_USERNAME=root
+export DB_PASSWORD=<db_password>
+export DB_NAME=certstore
 ```
 
-### Displaying a certificate ###
+### List all stored certificates ###
 
 ```bash
-export DB_PASSWORD=<your_db_password>
-.\CertStore show --id 1 --dbpass $DB_PASSWORD
+CertStore list
+```
+
+### Store a certificate ###
+
+```bash
+CertStore store certificate.pem
+```
+
+### Display a certificate ###
+
+```bash
+CertStore show --id 1
+```
+
+### Save a stored certificate as a file ###
+
+```bash
+CertStore save --id 1 output_certificate.pem 
 ```
