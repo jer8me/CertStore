@@ -8,8 +8,6 @@ import (
 	"os"
 )
 
-var certificateId int64
-
 var (
 	// Command
 	showCmd = &cobra.Command{
@@ -38,8 +36,7 @@ func showCertificate(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	showCmd.Flags().Int64VarP(&certificateId, "id", "i", 0, "Certificate Id")
-	showCmd.MarkFlagRequired("id")
 	addMySqlFlags(showCmd)
+	addIdFlag(showCmd, true)
 	rootCmd.AddCommand(showCmd)
 }
