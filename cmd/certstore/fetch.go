@@ -2,6 +2,7 @@ package certstore
 
 import (
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"os"
@@ -25,17 +26,18 @@ func fetchCertificate(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	// Fetch certificate
-	cert, err := storage.GetCertificate(db, certificateId)
+	x509Certificate, err := storage.GetX509Certificate(db, certificateId)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
 		os.Exit(1)
 	}
 	// Save certificate to file
 	filename := args[0]
-	fmt.Printf("Fetching certificate %s to file %s\n", cert.SerialNumber, filename)
-
-	// TODO save certificate to file
-
+	err = certificates.WritePEMFile(filename, x509Certificate)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to write certificate file %s: %v\n", filename, err)
+		os.Exit(1)
+	}
 	return nil
 }
 

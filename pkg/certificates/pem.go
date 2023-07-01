@@ -32,3 +32,21 @@ func ParsePEMFile(filename string) (*x509.Certificate, error) {
 	}
 	return certificate, nil
 }
+
+// WritePEMFile writes a x509 certificate to a PEM encoded file.
+// Returns an error if the certificate is invalid or if it fails to write the file.
+// If the file already exists, WritePEMFile returns an os.ErrExist error.
+func WritePEMFile(filename string, certificate *x509.Certificate) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 06444)
+	if err != nil {
+		return err
+	}
+	// Encode PEM content
+	block := &pem.Block{Type: "CERTIFICATE", Bytes: certificate.Raw}
+	err = pem.Encode(f, block)
+	if errc := f.Close(); errc != nil && err == nil {
+		// Encoding errors take priority
+		err = errc
+	}
+	return err
+}

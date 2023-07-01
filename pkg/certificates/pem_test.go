@@ -1,7 +1,13 @@
 package certificates
 
 import (
+	"crypto/x509"
+	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"io/fs"
+	"os"
+	"path"
 	"testing"
 )
 
@@ -88,4 +94,56 @@ func TestParsePEMFile(t *testing.T) {
 			assert.Equal(t, tt.want.DNSNames, got.DNSNames, "invalid certificate DNS Names")
 		})
 	}
+}
+
+func TestWritePEMFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		wantErr  assert.ErrorAssertionFunc
+	}{
+		{
+			"TestRSACertificate",
+			"testdata/champlain.crt",
+			assert.NoError,
+		},
+		{
+			"TestECDSACertificate",
+			"testdata/github.crt",
+			assert.NoError,
+		},
+		{
+			"TestEd25519Certificate",
+			"testdata/ed25519.crt",
+			assert.NoError,
+		},
+		{
+			"TestDSACertificate",
+			"testdata/dsa.crt",
+			assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			x509Certificate, err := ParsePEMFile(tt.filename)
+			require.NoError(t, err, "failed to parse certificate")
+			outfile := path.Join(t.TempDir(), path.Base(tt.filename))
+			tt.wantErr(t, WritePEMFile(outfile, x509Certificate), fmt.Sprintf("WritePEMFile(%v)", tt.filename))
+			expected, err := os.ReadFile(tt.filename)
+			require.NoError(t, err, "failed to read original certificate")
+			actual, err := os.ReadFile(outfile)
+			require.NoError(t, err, "failed to read original certificate")
+			assert.Equal(t, expected, actual, "certificate files do not match")
+		})
+	}
+	// Test for existing file
+	t.Run("TestExistingFile", func(t *testing.T) {
+		outfile := path.Join(t.TempDir(), path.Base("dummy.crt"))
+		data := []byte("TEST DATA")
+		err := os.WriteFile(outfile, data, 0644)
+		require.NoError(t, err, "failed to write test file")
+		dummyCert := &x509.Certificate{}
+		err = WritePEMFile(outfile, dummyCert)
+		assert.ErrorIs(t, err, fs.ErrExist, "WritePEMFile unexpected error")
+	})
 }

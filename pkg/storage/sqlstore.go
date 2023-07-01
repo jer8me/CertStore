@@ -64,6 +64,23 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	return cert, nil
 }
 
+func GetX509Certificate(db *sql.DB, certificateId int64) (*x509.Certificate, error) {
+	var der []byte
+	// Fetch raw certificate
+	err := db.QueryRow("SELECT rawContent FROM Certificate WHERE id = ?", certificateId).Scan(&der)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("GetX509Certificate: invalid certificate ID: %d", certificateId)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("GetX509Certificate: failed to query certificate ID %d: %w", certificateId, err)
+	}
+	x509Certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, fmt.Errorf("GetX509Certificate: failed to parse certificate ID %d: %w", certificateId, err)
+	}
+	return x509Certificate, nil
+}
+
 func GetCertificates(db *sql.DB) ([]*Certificate, error) {
 	rows, err := db.Query("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, " +
 		"c.notAfter, c.isCa FROM Certificate c " +
