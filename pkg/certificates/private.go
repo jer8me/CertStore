@@ -58,29 +58,29 @@ func CheckPrivateKey(x509Cert *x509.Certificate, privateKey crypto.PrivateKey) e
 	case *rsa.PublicKey:
 		privateKey, ok := privateKey.(*rsa.PrivateKey)
 		if !ok {
-			return errors.New("certificate: private key type does not match public key type")
+			return errors.New("certificates: private key type does not match public key type")
 		}
 		if publicKey.N.Cmp(privateKey.N) != 0 {
-			return errors.New("certificate: private key does not match public key")
+			return errors.New("certificates: private key does not match public key")
 		}
 	case *ecdsa.PublicKey:
 		privateKey, ok := privateKey.(*ecdsa.PrivateKey)
 		if !ok {
-			return errors.New("certificate: private key type does not match public key type")
+			return errors.New("certificates: private key type does not match public key type")
 		}
 		if publicKey.X.Cmp(privateKey.X) != 0 || publicKey.Y.Cmp(privateKey.Y) != 0 {
-			return errors.New("certificate: private key does not match public key")
+			return errors.New("certificates: private key does not match public key")
 		}
 	case ed25519.PublicKey:
 		privateKey, ok := privateKey.(ed25519.PrivateKey)
 		if !ok {
-			return errors.New("certificate: private key type does not match public key type")
+			return errors.New("certificates: private key type does not match public key type")
 		}
 		if !bytes.Equal(privateKey.Public().(ed25519.PublicKey), publicKey) {
-			return errors.New("certificate: private key does not match public key")
+			return errors.New("certificates: private key does not match public key")
 		}
 	default:
-		return errors.New("certificate: unknown public key algorithm")
+		return errors.New("certificates: unknown public key algorithm")
 	}
 	return nil
 }
