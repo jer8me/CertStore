@@ -1,8 +1,14 @@
 package certificates
 
 import (
+	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +23,7 @@ import (
 //   - ED25519 / PKCS8
 //
 // It returns an error if a valid private key cannot be parsed.
-func ParsePrivateKey(filename string) (any, error) {
+func ParsePrivateKey(filename string) (crypto.PrivateKey, error) {
 	// Load file content into memory
 	bytes, err := os.ReadFile(filename) // just pass the file name
 	if err != nil {
@@ -45,4 +51,36 @@ func ParsePrivateKey(filename string) (any, error) {
 		return nil, fmt.Errorf("failed to parse private key %s: %w", filename, err)
 	}
 	return privateKey, nil
+}
+
+func CheckPrivateKey(x509Cert *x509.Certificate, privateKey crypto.PrivateKey) error {
+	switch publicKey := x509Cert.PublicKey.(type) {
+	case *rsa.PublicKey:
+		privateKey, ok := privateKey.(*rsa.PrivateKey)
+		if !ok {
+			return errors.New("certificate: private key type does not match public key type")
+		}
+		if publicKey.N.Cmp(privateKey.N) != 0 {
+			return errors.New("certificate: private key does not match public key")
+		}
+	case *ecdsa.PublicKey:
+		privateKey, ok := privateKey.(*ecdsa.PrivateKey)
+		if !ok {
+			return errors.New("certificate: private key type does not match public key type")
+		}
+		if publicKey.X.Cmp(privateKey.X) != 0 || publicKey.Y.Cmp(privateKey.Y) != 0 {
+			return errors.New("certificate: private key does not match public key")
+		}
+	case ed25519.PublicKey:
+		privateKey, ok := privateKey.(ed25519.PrivateKey)
+		if !ok {
+			return errors.New("certificate: private key type does not match public key type")
+		}
+		if !bytes.Equal(privateKey.Public().(ed25519.PublicKey), publicKey) {
+			return errors.New("certificate: private key does not match public key")
+		}
+	default:
+		return errors.New("certificate: unknown public key algorithm")
+	}
+	return nil
 }

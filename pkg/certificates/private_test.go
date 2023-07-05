@@ -1,10 +1,11 @@
-package certificates
+package certificates_test
 
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -25,7 +26,7 @@ func TestParsePrivateKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParsePrivateKey(tt.filename)
+			got, err := certificates.ParsePrivateKey(tt.filename)
 			if !tt.wantErr(t, err, fmt.Sprintf("ParsePrivateKey(%v)", tt.filename)) {
 				return
 			}
@@ -45,4 +46,16 @@ func TestParsePrivateKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckPrivateKey(t *testing.T) {
+
+	x509Certificate, err := certificates.ParsePEMFile("testdata/rsa2048.crt")
+	assert.NoError(t, err, "failed to load X.509 certificate")
+
+	privateKey, err := certificates.ParsePrivateKey("testdata/rsa2048.key")
+	assert.NoError(t, err, "failed to load private key")
+
+	err = certificates.CheckPrivateKey(x509Certificate, privateKey)
+	assert.NoError(t, err, "public and private key do no match")
 }
