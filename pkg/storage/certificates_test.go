@@ -59,7 +59,7 @@ func TestCertificateKeyUsage(t *testing.T) {
 	}{
 		{"TestChamplainCertificate", certPath("champlain.crt"), []string{"DigitalSignature", "KeyEncipherment"}},
 		{"TestDSACertificate", certPath("dsa.crt"), []string{"KeyEncipherment", "DataEncipherment"}},
-		{"TestEd25519Certificate", certPath("ed25519.crt"), []string{"KeyEncipherment", "DataEncipherment"}},
+		{"TestEd25519Certificate", certPath("ed25519.crt"), []string{"DigitalSignature", "KeyEncipherment"}},
 		{"TestGithubCertificate", certPath("github.crt"), []string{"DigitalSignature"}},
 	}
 	for _, tt := range tests {

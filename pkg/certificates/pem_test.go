@@ -61,7 +61,7 @@ func TestParsePEMFile(t *testing.T) {
 				false,
 				"Jerome Root CA",
 				"Jerome Meyer",
-				[]string{"www.sdev435.edu", "sdev435.edu"},
+				[]string{"www.sdev435.edu", "sdev435.edu", "localhost"},
 			},
 			false,
 		},
