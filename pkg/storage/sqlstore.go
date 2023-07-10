@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 )
 
@@ -275,6 +276,44 @@ func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error)
 	return StoreCertificate(db, certificate)
 }
 
+func StorePrivateKey(db *sql.DB, privateKey common.PrivateKey) (int64, error) {
+
+	// Marshal private key into a byte slice in PKCS 8 form
+	pkBytes, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
+	if err != nil {
+		return 0, err
+	}
+
+	// Get the corresponding public key to calculate the fingerprint.
+	// We must compute the fingerprint of the public key, not the private key.
+	publicKey := privateKey.PublicKey()
+	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return 0, err
+	}
+	sha256Sum := sha256.Sum256(pubBytes)
+	sha256Fingerprint := hex.EncodeToString(sha256Sum[:])
+
+	// Get private key type ID
+	privateKeyTypeId, err := GetPrivateKeyTypeId(db, privateKey.Type())
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := db.Exec("INSERT INTO PrivateKey (encryptedKey, privateKeyType_id, pemType, "+
+		"sha256Fingerprint) VALUE (?, ?, ?, ?)", pkBytes, privateKeyTypeId, privateKey.PEMType, sha256Fingerprint)
+	if err != nil {
+		return 0, err
+	}
+	// Get SubjectAlternateName ID from INSERT
+	privateKeyId, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return privateKeyId, nil
+}
+
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
 // Error is not nil if the string is invalid or if the database query fails.
 func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
@@ -329,6 +368,20 @@ func GetSignatureAlgorithmName(db *sql.DB, signatureAlgorithmId int) (string, er
 		return "", fmt.Errorf("failed to query signature algorithm ID: %w", err)
 	}
 	return name, nil
+}
+
+// GetPrivateKeyTypeId looks up the ID for a PrivateKeyType string
+// Error is not nil if the string is invalid or if the database query fails.
+func GetPrivateKeyTypeId(db *sql.DB, privateKeyType string) (int, error) {
+	var id int
+	err := db.QueryRow("SELECT id FROM PrivateKeyType WHERE name = ?", privateKeyType).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("invalid private key type name: %s", privateKeyType)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to query private key type ID: %w", err)
+	}
+	return id, nil
 }
 
 // GetCertificateKeyUsages looks up the key usage names for a certificate ID.

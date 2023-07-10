@@ -2,7 +2,6 @@ package certificates
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -10,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 	"os"
 )
@@ -23,7 +23,7 @@ import (
 //   - ED25519 / PKCS8
 //
 // It returns an error if a valid private key cannot be parsed.
-func ParsePrivateKey(filename string) (crypto.PrivateKey, error) {
+func ParsePrivateKey(filename string) (*common.PrivateKey, error) {
 	// Load file content into memory
 	bytes, err := os.ReadFile(filename) // just pass the file name
 	if err != nil {
@@ -50,10 +50,11 @@ func ParsePrivateKey(filename string) (crypto.PrivateKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key %s: %w", filename, err)
 	}
-	return privateKey, nil
+	return common.NewPrivateKey(block.Type, privateKey), nil
 }
 
-func CheckPrivateKey(x509Cert *x509.Certificate, privateKey crypto.PrivateKey) error {
+func CheckPrivateKey(x509Cert *x509.Certificate, pk *common.PrivateKey) error {
+	privateKey := pk.PrivateKey
 	switch publicKey := x509Cert.PublicKey.(type) {
 	case *rsa.PublicKey:
 		privateKey, ok := privateKey.(*rsa.PrivateKey)

@@ -34,14 +34,15 @@ func TestParsePrivateKey(t *testing.T) {
 			if err != nil {
 				return
 			}
-			assert.IsType(t, tt.wantType, got)
-			switch got := got.(type) {
+			privateKey := got.PrivateKey
+			assert.IsType(t, tt.wantType, privateKey)
+			switch privateKey := privateKey.(type) {
 			case *rsa.PrivateKey:
-				assert.NoError(t, got.Validate())
+				assert.NoError(t, privateKey.Validate())
 			case ed25519.PrivateKey:
-				assert.Len(t, got.Seed(), 32)
+				assert.Len(t, privateKey.Seed(), 32)
 			case *ecdsa.PrivateKey:
-				assert.Equal(t, got.Curve.Params().Name, "P-521")
+				assert.Equal(t, privateKey.Curve.Params().Name, "P-521")
 			default:
 				assert.Fail(t, "invalid private key type", "unknown private key type: %T", got)
 			}

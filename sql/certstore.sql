@@ -61,9 +61,11 @@ CREATE TABLE IF NOT EXISTS PrivateKeyType (
 DROP TABLE IF EXISTS PrivateKey;
 
 CREATE TABLE IF NOT EXISTS PrivateKey (
-  id INT NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT,
   encryptedKey BLOB NOT NULL,
   privateKeyType_id INT NOT NULL,
+  pemType VARCHAR(64) NOT NULL,
+  sha256Fingerprint VARCHAR(64) NOT NULL,
   PRIMARY KEY (id ASC),
   INDEX (privateKeyType_id ASC),
   CONSTRAINT fk_PrivateKey_PrivateKeyType
