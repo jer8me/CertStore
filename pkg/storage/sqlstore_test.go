@@ -34,11 +34,29 @@ func openMySql(t *testing.T) *sql.DB {
 	return sql.OpenDB(connector)
 }
 
+func clearDb(t *testing.T, db *sql.DB) {
+	sqlStatements := []string{
+		"DELETE FROM CertificateSAN",
+		"DELETE FROM SubjectAlternateName",
+		"DELETE FROM CertificateKeyUsage",
+		"DELETE FROM CertificateOwner",
+		"DELETE FROM CertificateAttribute",
+		"DELETE FROM Certificate",
+		"DELETE FROM PrivateKey",
+		"DELETE FROM User",
+	}
+	for _, sqlStatement := range sqlStatements {
+		_, err := db.Exec(sqlStatement)
+		require.NoError(t, err, "failed to setup database")
+	}
+}
+
 func TestGetCertificate(t *testing.T) {
 
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	// Read certificate file
 	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
@@ -68,6 +86,7 @@ func TestStoreCertificate(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	certificateId, err := storage.StoreCertificate(db, certificate)
 	if err != nil {
@@ -81,6 +100,7 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	tests := []struct {
 		name               string
@@ -115,6 +135,7 @@ func TestGetPublicKeyAlgorithmName(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	tests := []struct {
 		name                 string
@@ -146,6 +167,7 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	tests := []struct {
 		name               string
@@ -192,6 +214,7 @@ func TestGetSignatureAlgorithmName(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	tests := []struct {
 		name                 string
@@ -222,6 +245,7 @@ func TestGetSANTypes(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	sanTypes, err := storage.GetSANTypes(db)
 	if err != nil {
@@ -244,6 +268,7 @@ func TestGetAttributeTypes(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	attributeTypes, err := storage.GetAttributeTypes(db)
 	if err != nil {
@@ -263,6 +288,7 @@ func TestStorePrivateKey(t *testing.T) {
 	// Connect to database
 	db := openMySql(t)
 	defer db.Close()
+	clearDb(t, db)
 
 	// Read certificate file
 	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))

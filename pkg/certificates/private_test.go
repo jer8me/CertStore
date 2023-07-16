@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
 	"path"
 	"testing"
 )
@@ -82,6 +84,39 @@ func TestCheckPrivateKey(t *testing.T) {
 			} else {
 				assert.ErrorContains(t, err, tt.errContains)
 			}
+		})
+	}
+}
+
+func TestReadWritePrivateKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		wantErr  assert.ErrorAssertionFunc
+	}{
+		{"TestRSA2048PrivateKey", "rsa2048.key", assert.NoError},
+		{"TestRSA2048PK8PrivateKey", "rsapk8.key", assert.NoError},
+		{"TestED25519PrivateKey", "ed25519.key", assert.NoError},
+		{"TestECDSAPrivateKey", "secp521r1.key", assert.NoError},
+		{"TestECDSAPK8PrivateKey", "ecdsapk8.key", assert.NoError},
+		{"TestUnsupportedPrivateKey", "dsa.key", assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filepath := path.Join("testdata", tt.filename)
+			privateKey, err := certificates.ParsePrivateKey(filepath)
+			tt.wantErr(t, err, fmt.Sprintf("ParsePrivateKey(%v)", filepath))
+			if err != nil {
+				return
+			}
+			outfile := path.Join(t.TempDir(), path.Base(tt.filename))
+			err = certificates.WritePrivateKey(outfile, privateKey)
+			require.NoError(t, err, "failed to write private key")
+			expected, err := os.ReadFile(filepath)
+			require.NoError(t, err, "failed to read original private key")
+			actual, err := os.ReadFile(outfile)
+			require.NoError(t, err, "failed to read private key")
+			assert.Equal(t, expected, actual, "private keys do not match")
 		})
 	}
 }

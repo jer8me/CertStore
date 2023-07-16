@@ -14,6 +14,11 @@ import (
 	"os"
 )
 
+const (
+	RsaPrivateKey = "RSA PRIVATE KEY"
+	EcPrivateKey  = "EC PRIVATE KEY"
+)
+
 // ParsePrivateKey parses a private key stored in a file.
 // It supports the following formats:
 //   - RSA / PKCS1
@@ -40,9 +45,9 @@ func ParsePrivateKey(filename string) (*common.PrivateKey, error) {
 	}
 	var privateKey any
 	switch block.Type {
-	case "RSA PRIVATE KEY":
+	case RsaPrivateKey:
 		privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	case "EC PRIVATE KEY":
+	case EcPrivateKey:
 		privateKey, err = x509.ParseECPrivateKey(block.Bytes)
 	default:
 		privateKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -84,4 +89,48 @@ func CheckPrivateKey(x509Cert *x509.Certificate, pk *common.PrivateKey) error {
 		return errors.New("certificates: unknown public key algorithm")
 	}
 	return nil
+}
+
+// WritePrivateKey writes a private key to a PEM encoded file.
+// The output format is derived from the PEM type value.
+// Returns an error if the private key is invalid or if it fails to write the file.
+// If the file already exists, WritePrivateKey returns an os.ErrExist error.
+func WritePrivateKey(filename string, privateKey *common.PrivateKey) error {
+
+	var err error
+	var privateKeyBytes []byte
+
+	// Marshal the private key into an ASN.1 DER form
+	switch pk := privateKey.PrivateKey.(type) {
+	case *rsa.PrivateKey:
+		if privateKey.PEMType == RsaPrivateKey {
+			// RSA / PKCS1
+			privateKeyBytes = x509.MarshalPKCS1PrivateKey(pk)
+		}
+	case *ecdsa.PrivateKey:
+		if privateKey.PEMType == EcPrivateKey {
+			// ECDSA / SEC1
+			privateKeyBytes, err = x509.MarshalECPrivateKey(pk)
+		}
+	}
+	if err == nil && len(privateKeyBytes) == 0 {
+		// PKCS8
+		privateKeyBytes, err = x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
+	}
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 06444)
+	if err != nil {
+		return err
+	}
+	// Encode PEM content
+	block := &pem.Block{Type: privateKey.PEMType, Bytes: privateKeyBytes}
+	err = pem.Encode(f, block)
+	if errc := f.Close(); errc != nil && err == nil {
+		// Encoding errors take priority
+		err = errc
+	}
+	return err
 }
