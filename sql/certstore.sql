@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS PrivateKey (
   sha256Fingerprint VARCHAR(64) NOT NULL,
   PRIMARY KEY (id ASC),
   INDEX (privateKeyType_id ASC),
+  INDEX (sha256Fingerprint ASC),
   CONSTRAINT fk_PrivateKey_PrivateKeyType
     FOREIGN KEY (privateKeyType_id)
     REFERENCES PrivateKeyType (id)
@@ -99,6 +100,7 @@ CREATE TABLE IF NOT EXISTS Certificate (
   INDEX (publicKeyAlgorithm_id ASC),
   INDEX (signatureAlgorithm_id ASC),
   INDEX (privateKey_id ASC),
+  INDEX (sha256Fingerprint ASC),
   CONSTRAINT fk_Certificate_PublicKeyAlgorithm
     FOREIGN KEY (publicKeyAlgorithm_id)
     REFERENCES PublicKeyAlgorithm (id),

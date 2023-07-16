@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"database/sql"
@@ -276,7 +277,7 @@ func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error)
 	return StoreCertificate(db, certificate)
 }
 
-func StorePrivateKey(db *sql.DB, privateKey common.PrivateKey) (int64, error) {
+func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
 
 	// Marshal private key into a byte slice in PKCS 8 form
 	pkBytes, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
@@ -300,18 +301,67 @@ func StorePrivateKey(db *sql.DB, privateKey common.PrivateKey) (int64, error) {
 		return 0, err
 	}
 
-	result, err := db.Exec("INSERT INTO PrivateKey (encryptedKey, privateKeyType_id, pemType, "+
+	// Create context for transaction
+	ctx := context.Background()
+
+	// Get a Tx for making transaction requests.
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	// Defer transaction rollback in case anything fails.
+	defer tx.Rollback()
+
+	// Check if this private key already exists in the database
+	var privateKeyId int64
+	err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", sha256Fingerprint).Scan(&privateKeyId)
+	if err == nil {
+		// Found matching private key: return id
+		return privateKeyId, nil
+	} else if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
+	}
+
+	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedKey, privateKeyType_id, pemType, "+
 		"sha256Fingerprint) VALUE (?, ?, ?, ?)", pkBytes, privateKeyTypeId, privateKey.PEMType, sha256Fingerprint)
 	if err != nil {
 		return 0, err
 	}
-	// Get SubjectAlternateName ID from INSERT
-	privateKeyId, err := result.LastInsertId()
+	// Get PrivateKey ID from INSERT
+	privateKeyId, err = result.LastInsertId()
 	if err != nil {
 		return 0, err
 	}
 
+	// Commit the transaction.
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit StorePrivateKey transaction: %w", err)
+	}
+
 	return privateKeyId, nil
+}
+
+func GetPrivateKey(db *sql.DB, privateKeyId int64) (*common.PrivateKey, error) {
+	var privateKeyBytes []byte
+	var pemType string
+
+	// Fetch Private Key
+	err := db.QueryRow("SELECT encryptedKey, pemType FROM PrivateKey WHERE id = ?", privateKeyId).Scan(&privateKeyBytes, &pemType)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
+	}
+
+	// Parse private key bytes into a private key object
+	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key ID %d: %w", privateKeyId, err)
+	}
+	privateKey = privateKey.(crypto.PrivateKey)
+
+	return common.NewPrivateKey(pemType, privateKey), nil
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
@@ -374,7 +424,7 @@ func GetSignatureAlgorithmName(db *sql.DB, signatureAlgorithmId int) (string, er
 // Error is not nil if the string is invalid or if the database query fails.
 func GetPrivateKeyTypeId(db *sql.DB, privateKeyType string) (int, error) {
 	var id int
-	err := db.QueryRow("SELECT id FROM PrivateKeyType WHERE name = ?", privateKeyType).Scan(&id)
+	err := db.QueryRow("SELECT id FROM PrivateKeyType WHERE type = ?", privateKeyType).Scan(&id)
 	if err == sql.ErrNoRows {
 		return 0, fmt.Errorf("invalid private key type name: %s", privateKeyType)
 	}

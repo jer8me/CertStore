@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"crypto/rsa"
 	"database/sql"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
@@ -255,4 +256,26 @@ func TestGetAttributeTypes(t *testing.T) {
 		assert.NotEmpty(t, attributeType.Name, "attribute type name is missing")
 		assert.NotEmpty(t, attributeType.Description, "attribute type description is missing")
 	}
+}
+
+func TestStorePrivateKey(t *testing.T) {
+
+	// Connect to database
+	db := openMySql(t)
+	defer db.Close()
+
+	// Read certificate file
+	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
+	require.NoError(t, err, "failed to read RSA private key")
+
+	// Store private key in database
+	privateKeyId, err := storage.StorePrivateKey(db, rsaPrivateKey)
+	require.NoError(t, err, "failed to store private key")
+
+	// Read stored private key and check it
+	privateKey, err := storage.GetPrivateKey(db, privateKeyId)
+	require.NoError(t, err, "failed to get private key")
+
+	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
+	assert.IsType(t, &rsa.PrivateKey{}, privateKey.PrivateKey)
 }
