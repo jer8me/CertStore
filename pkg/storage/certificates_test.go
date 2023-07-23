@@ -1,11 +1,13 @@
 package storage_test
 
 import (
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,4 +157,23 @@ func TestGetAttributes(t *testing.T) {
 	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.7", Value: localityName})
 	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.10", Value: organizationName})
 	assert.Contains(t, parsedAttributes, storage.Attribute{Oid: "2.5.4.3", Value: commonName})
+}
+
+func TestEncryptDecryptPrivateKey(t *testing.T) {
+	// Generate a KEK (Key Encryption Key)
+	kek, err := common.GenerateCryptoRandom(32)
+
+	// Read private key file
+	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
+	require.NoError(t, err, "failed to read RSA private key")
+
+	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, kek)
+	require.NoError(t, err, "failed to encrypt private key")
+
+	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, kek)
+	require.NoError(t, err, "failed to encrypt private key")
+
+	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
+	assert.IsType(t, &rsa.PrivateKey{}, privateKey.PrivateKey)
+	assert.True(t, rsaPrivateKey.Equal(privateKey), "private keys do not match")
 }

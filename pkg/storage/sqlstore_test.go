@@ -290,7 +290,7 @@ func TestStorePrivateKey(t *testing.T) {
 	defer db.Close()
 	clearDb(t, db)
 
-	// Read certificate file
+	// Read private key file
 	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
 	require.NoError(t, err, "failed to read RSA private key")
 

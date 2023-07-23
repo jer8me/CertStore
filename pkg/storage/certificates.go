@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"crypto"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
@@ -8,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 	"strconv"
 	"strings"
@@ -54,6 +57,16 @@ type SANType struct {
 	Name string
 }
 
+// PrivateKey represents the database model for a private key
+type PrivateKey struct {
+	Id                int64
+	EncryptedPKCS8    []byte
+	Type              string
+	PEMType           string
+	DataEncryptionKey string
+	SHA256Fingerprint string
+}
+
 const (
 	DnsName      = "DNSName"
 	EmailAddress = "EmailAddress"
@@ -86,6 +99,75 @@ func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 		IsCA:               x509certificate.IsCA,
 		RawContent:         x509certificate.Raw,
 	}
+}
+
+// EncryptPrivateKey converts a PrivateKey into an encrypted private key database model
+// kek is the Key Encryption Key.
+func EncryptPrivateKey(privateKey *common.PrivateKey, kek []byte) (*PrivateKey, error) {
+
+	// Get the corresponding public key to calculate the fingerprint.
+	// We must compute the fingerprint of the public key, not the private key.
+	publicKey, err := x509.MarshalPKIXPublicKey(privateKey.PublicKey())
+	if err != nil {
+		return nil, err
+	}
+	sha256Sum := sha256.Sum256(publicKey)
+
+	// Marshal private key into a byte slice in PKCS 8 form
+	pkcs8, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate a unique encryption key for this private key
+	dek, err := common.GenerateCryptoRandom(32)
+	if err != nil {
+		return nil, err
+	}
+	// Encrypt the DEK (data encryption key) with the KEK (key encryption key)
+	encryptedDEK, err := common.EncryptGCM(dek, kek)
+	if err != nil {
+		return nil, err
+	}
+
+	// Encrypt the private key with the DEK
+	encryptedPKCS8, err := common.EncryptGCM(pkcs8, dek)
+
+	return &PrivateKey{
+		EncryptedPKCS8:    encryptedPKCS8,
+		Type:              privateKey.Type(),
+		PEMType:           privateKey.PEMType,
+		DataEncryptionKey: hex.EncodeToString(encryptedDEK),
+		SHA256Fingerprint: hex.EncodeToString(sha256Sum[:]),
+	}, nil
+}
+
+// DecryptPrivateKey converts an encrypted private key database model into a common private key.
+// kek is the Key Encryption Key which must match the key used for encryption
+func DecryptPrivateKey(privateKey *PrivateKey, kek []byte) (*common.PrivateKey, error) {
+
+	// Decode hex encoded key into a byte slice
+	encryptedDEK, err := hex.DecodeString(privateKey.DataEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	// Decrypt the DEK (Data Encryption Key) with the KEK (Key Encryption Key)
+	dek, err := common.DecryptGCM(encryptedDEK, kek)
+
+	// Decrypt the PKCS8 private key with the DEK
+	pkcs8, err := common.DecryptGCM(privateKey.EncryptedPKCS8, dek)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse private key bytes into a private key object
+	pk, err := x509.ParsePKCS8PrivateKey(pkcs8)
+	if err != nil {
+		return nil, err
+	}
+	pk = pk.(crypto.PrivateKey)
+
+	return common.NewPrivateKey(privateKey.PEMType, pk), nil
 }
 
 // GetSerialNumber returns the serial number of the certificate as a hex string

@@ -27,6 +27,11 @@ func (pk *PrivateKey) PublicKey() crypto.PublicKey {
 	return private.Public()
 }
 
+func (pk *PrivateKey) Equal(other *PrivateKey) bool {
+	private := pk.PrivateKey.(privKey)
+	return private.Equal(other.PrivateKey)
+}
+
 // Type returns the type of the private key as a string.
 // Types can be: RSA, ECDSA, Ed25519, ECDH or Unknown
 func (pk *PrivateKey) Type() string {
