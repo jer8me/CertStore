@@ -323,7 +323,7 @@ func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
 	}
 
 	dataEncryptionKey := []byte{0x01, 0x02}
-	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedData, privateKeyType_id, pemType, sha256Fingerprint, "+
+	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, privateKeyType_id, pemType, sha256Fingerprint, "+
 		"dataEncryptionKey) VALUE (?, ?, ?, ?, ?)", pkBytes, privateKeyTypeId, privateKey.PEMType, sha256Fingerprint, dataEncryptionKey)
 	if err != nil {
 		return 0, err
@@ -348,7 +348,7 @@ func GetPrivateKey(db *sql.DB, privateKeyId int64) (*common.PrivateKey, error) {
 	var pemType string
 
 	// Fetch Private Key
-	err := db.QueryRow("SELECT encryptedData, pemType, dataEncryptionKey FROM PrivateKey WHERE id = ?", privateKeyId).
+	err := db.QueryRow("SELECT encryptedPkcs8, pemType, dataEncryptionKey FROM PrivateKey WHERE id = ?", privateKeyId).
 		Scan(&privateKeyBytes, &pemType, &dataEncryptionKey)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
