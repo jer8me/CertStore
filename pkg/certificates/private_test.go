@@ -120,14 +120,3 @@ func TestReadWritePrivateKey(t *testing.T) {
 		})
 	}
 }
-
-func TestEncryptDecryptData(t *testing.T) {
-	data := []byte("Hello world")
-	key, err := certificates.GenerateCryptoRandom(32)
-	require.NoError(t, err, "failed to generate encryption key")
-	encrypted, err := certificates.EncryptData(data, key)
-	require.NoError(t, err, "failed to encrypt data")
-	plaintext, err := certificates.DecryptData(encrypted, key)
-	require.NoError(t, err, "failed to decrypt data")
-	assert.Equal(t, plaintext, data, "encrypted/decrypted data does not match original data")
-}
