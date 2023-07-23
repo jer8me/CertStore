@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS PrivateKey (
   privateKeyType_id INT NOT NULL,
   pemType VARCHAR(64) NOT NULL,
   sha256Fingerprint VARCHAR(64) NOT NULL,
+  dataEncryptionKey VARCHAR(64) NOT NULL,
   PRIMARY KEY (id ASC),
   INDEX (privateKeyType_id ASC),
   INDEX (sha256Fingerprint ASC),
