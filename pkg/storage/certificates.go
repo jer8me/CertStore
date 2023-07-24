@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/common"
+	"golang.org/x/crypto/scrypt"
 	"log"
 	"strconv"
 	"strings"
@@ -79,6 +80,9 @@ const (
 	Subject = "Subject"
 )
 
+// TODO: the salt should ideally be a random value per password
+var salt = []byte{0x92, 0xe7, 0x7b, 0x9d, 0xd8, 0x15, 0x70, 0x08}
+
 // ToCertificate converts a x509 certificate into a certificate database model
 func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 	return &Certificate{
@@ -102,8 +106,8 @@ func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 }
 
 // EncryptPrivateKey converts a PrivateKey into an encrypted private key database model
-// kek is the Key Encryption Key.
-func EncryptPrivateKey(privateKey *common.PrivateKey, kek []byte) (*PrivateKey, error) {
+// password is the password used to derive a Key Encryption Key (KEK).
+func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*PrivateKey, error) {
 
 	// Get the corresponding public key to calculate the fingerprint.
 	// We must compute the fingerprint of the public key, not the private key.
@@ -124,8 +128,15 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, kek []byte) (*PrivateKey, 
 	if err != nil {
 		return nil, err
 	}
-	// Encrypt the DEK (data encryption key) with the KEK (key encryption key)
-	encryptedDEK, err := common.EncryptGCM(dek, kek)
+
+	// Compute a derived Key Encryption Key (KEK) from the password provided
+	derivedKey, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	// Encrypt the DEK (data encryption key) with the derived KEK (key encryption key)
+	encryptedDEK, err := common.EncryptGCM(dek, derivedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -143,16 +154,23 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, kek []byte) (*PrivateKey, 
 }
 
 // DecryptPrivateKey converts an encrypted private key database model into a common private key.
-// kek is the Key Encryption Key which must match the key used for encryption
-func DecryptPrivateKey(privateKey *PrivateKey, kek []byte) (*common.PrivateKey, error) {
+// password is the password used to derive a Key Encryption Key (KEK).
+func DecryptPrivateKey(privateKey *PrivateKey, password string) (*common.PrivateKey, error) {
 
 	// Decode hex encoded key into a byte slice
 	encryptedDEK, err := hex.DecodeString(privateKey.DataEncryptionKey)
 	if err != nil {
 		return nil, err
 	}
+
+	// Compute a derived Key Encryption Key (KEK) from the password provided
+	derivedKey, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	if err != nil {
+		return nil, err
+	}
+
 	// Decrypt the DEK (Data Encryption Key) with the KEK (Key Encryption Key)
-	dek, err := common.DecryptGCM(encryptedDEK, kek)
+	dek, err := common.DecryptGCM(encryptedDEK, derivedKey)
 
 	// Decrypt the PKCS8 private key with the DEK
 	pkcs8, err := common.DecryptGCM(privateKey.EncryptedPKCS8, dek)
