@@ -2,13 +2,11 @@ package storage
 
 import (
 	"context"
-	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 )
 
@@ -277,26 +275,10 @@ func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error)
 	return StoreCertificate(db, certificate)
 }
 
-func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
-
-	// Marshal private key into a byte slice in PKCS 8 form
-	pkBytes, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
-	if err != nil {
-		return 0, err
-	}
-
-	// Get the corresponding public key to calculate the fingerprint.
-	// We must compute the fingerprint of the public key, not the private key.
-	publicKey := privateKey.PublicKey()
-	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return 0, err
-	}
-	sha256Sum := sha256.Sum256(pubBytes)
-	sha256Fingerprint := hex.EncodeToString(sha256Sum[:])
+func StorePrivateKey(db *sql.DB, privateKey *PrivateKey) (int64, error) {
 
 	// Get private key type ID
-	privateKeyTypeId, err := GetPrivateKeyTypeId(db, privateKey.Type())
+	privateKeyTypeId, err := GetPrivateKeyTypeId(db, privateKey.Type)
 	if err != nil {
 		return 0, err
 	}
@@ -314,7 +296,7 @@ func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
 
 	// Check if this private key already exists in the database
 	var privateKeyId int64
-	err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", sha256Fingerprint).Scan(&privateKeyId)
+	err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", privateKey.SHA256Fingerprint).Scan(&privateKeyId)
 	if err == nil {
 		// Found matching private key: return id
 		return privateKeyId, nil
@@ -322,9 +304,9 @@ func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
 		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 	}
 
-	dataEncryptionKey := []byte{0x01, 0x02}
-	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, privateKeyType_id, pemType, sha256Fingerprint, "+
-		"dataEncryptionKey) VALUE (?, ?, ?, ?, ?)", pkBytes, privateKeyTypeId, privateKey.PEMType, sha256Fingerprint, dataEncryptionKey)
+	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, privateKeyType_id, pemType, sha256Fingerprint,"+
+		"dataEncryptionKey) VALUE (?, ?, ?, ?, ?)", privateKey.EncryptedPKCS8, privateKeyTypeId, privateKey.PEMType,
+		privateKey.SHA256Fingerprint, privateKey.DataEncryptionKey)
 	if err != nil {
 		return 0, err
 	}
@@ -342,29 +324,19 @@ func StorePrivateKey(db *sql.DB, privateKey *common.PrivateKey) (int64, error) {
 	return privateKeyId, nil
 }
 
-func GetPrivateKey(db *sql.DB, privateKeyId int64) (*common.PrivateKey, error) {
-	var privateKeyBytes []byte
-	var dataEncryptionKey []byte
-	var pemType string
-
+func GetPrivateKey(db *sql.DB, privateKeyId int64) (*PrivateKey, error) {
+	privateKey := &PrivateKey{Id: privateKeyId}
 	// Fetch Private Key
-	err := db.QueryRow("SELECT encryptedPkcs8, pemType, dataEncryptionKey FROM PrivateKey WHERE id = ?", privateKeyId).
-		Scan(&privateKeyBytes, &pemType, &dataEncryptionKey)
+	err := db.QueryRow("SELECT pk.encryptedPkcs8, pkt.type, pk.pemType, pk.dataEncryptionKey, pk.SHA256Fingerprint FROM PrivateKey pk "+
+		"INNER JOIN PrivateKeyType pkt ON pk.privateKeyType_id = pkt.id WHERE pk.id = ?", privateKeyId).Scan(&privateKey.EncryptedPKCS8,
+		&privateKey.Type, &privateKey.PEMType, &privateKey.DataEncryptionKey, &privateKey.SHA256Fingerprint)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
 	}
-
-	// Parse private key bytes into a private key object
-	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key ID %d: %w", privateKeyId, err)
-	}
-	privateKey = privateKey.(crypto.PrivateKey)
-
-	return common.NewPrivateKey(pemType, privateKey), nil
+	return privateKey, nil
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string

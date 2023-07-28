@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -290,18 +291,29 @@ func TestStorePrivateKey(t *testing.T) {
 	defer db.Close()
 	clearDb(t, db)
 
+	password := "password123"
+	salt := common.GenerateCryptoRandom(8)
+
 	// Read private key file
 	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
 	require.NoError(t, err, "failed to read RSA private key")
 
+	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password, salt)
+	require.NoError(t, err, "failed to encrypt private key")
+
 	// Store private key in database
-	privateKeyId, err := storage.StorePrivateKey(db, rsaPrivateKey)
+	privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey)
 	require.NoError(t, err, "failed to store private key")
 
-	// Read stored private key and check it
-	privateKey, err := storage.GetPrivateKey(db, privateKeyId)
+	// Read stored encrypted private key
+	privateKeyFound, err := storage.GetPrivateKey(db, privateKeyId)
 	require.NoError(t, err, "failed to get private key")
+
+	// Decrypt private key fetched from database
+	privateKey, err := storage.DecryptPrivateKey(privateKeyFound, password, salt)
+	require.NoError(t, err, "failed to decrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
 	assert.IsType(t, &rsa.PrivateKey{}, privateKey.PrivateKey)
+	assert.True(t, rsaPrivateKey.Equal(privateKey), "private keys do not match")
 }

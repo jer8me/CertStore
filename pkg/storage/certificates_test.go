@@ -172,7 +172,7 @@ func TestEncryptDecryptPrivateKey(t *testing.T) {
 	require.NoError(t, err, "failed to encrypt private key")
 
 	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password, salt)
-	require.NoError(t, err, "failed to encrypt private key")
+	require.NoError(t, err, "failed to decrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
 	assert.IsType(t, &rsa.PrivateKey{}, privateKey.PrivateKey)
