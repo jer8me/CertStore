@@ -5,16 +5,17 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"io"
+	"log"
 )
 
 // GenerateCryptoRandom generates cryptographically random bytes of the size specified.
 // For AES encryption, the size should be 16, 24, or 32 bytes to select AES-128, AES-192, or AES-256.
-func GenerateCryptoRandom(size int) ([]byte, error) {
+func GenerateCryptoRandom(size int) []byte {
 	key := make([]byte, size)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return nil, err
+		log.Panicf("failed to generate random bytes: %s", err)
 	}
-	return key, nil
+	return key
 }
 
 // EncryptGCM encrypts a byte array with the key provided.
@@ -31,10 +32,7 @@ func EncryptGCM(data []byte, key []byte) ([]byte, error) {
 	}
 	// Generate a random nonce
 	// The nonce must be random but does not need to be secure - we still store it alongside the ciphertext
-	nonce, err := GenerateCryptoRandom(aesgcm.NonceSize())
-	if err != nil {
-		return nil, err
-	}
+	nonce := GenerateCryptoRandom(aesgcm.NonceSize())
 	// Allocate an array of bytes for the ciphertext
 	// The format of the ciphertext is: [NONCE][ENCRYPTED DATA][SIGNATURE]
 	size := aesgcm.NonceSize() + len(data) + aesgcm.Overhead()

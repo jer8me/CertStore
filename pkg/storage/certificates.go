@@ -80,9 +80,6 @@ const (
 	Subject = "Subject"
 )
 
-// TODO: the salt should ideally be a random value per password
-var salt = []byte{0x92, 0xe7, 0x7b, 0x9d, 0xd8, 0x15, 0x70, 0x08}
-
 // ToCertificate converts a x509 certificate into a certificate database model
 func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 	return &Certificate{
@@ -107,27 +104,10 @@ func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 
 // EncryptPrivateKey converts a PrivateKey into an encrypted private key database model
 // password is the password used to derive a Key Encryption Key (KEK).
-func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*PrivateKey, error) {
-
-	// Get the corresponding public key to calculate the fingerprint.
-	// We must compute the fingerprint of the public key, not the private key.
-	publicKey, err := x509.MarshalPKIXPublicKey(privateKey.PublicKey())
-	if err != nil {
-		return nil, err
-	}
-	sha256Sum := sha256.Sum256(publicKey)
-
-	// Marshal private key into a byte slice in PKCS 8 form
-	pkcs8, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
+func EncryptPrivateKey(privateKey *common.PrivateKey, password string, salt []byte) (*PrivateKey, error) {
 
 	// Generate a unique encryption key for this private key
-	dek, err := common.GenerateCryptoRandom(32)
-	if err != nil {
-		return nil, err
-	}
+	dek := common.GenerateCryptoRandom(32)
 
 	// Compute a derived Key Encryption Key (KEK) from the password provided
 	derivedKey, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
@@ -141,8 +121,22 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*Private
 		return nil, err
 	}
 
+	// Marshal private key into a byte slice in PKCS 8 form
+	pkcs8, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	// Encrypt the private key with the DEK
 	encryptedPKCS8, err := common.EncryptGCM(pkcs8, dek)
+
+	// Get the corresponding public key to calculate the fingerprint.
+	// We must compute the fingerprint of the public key, not the private key.
+	publicKey, err := x509.MarshalPKIXPublicKey(privateKey.PublicKey())
+	if err != nil {
+		return nil, err
+	}
+	sha256Sum := sha256.Sum256(publicKey)
 
 	return &PrivateKey{
 		EncryptedPKCS8:    encryptedPKCS8,
@@ -155,7 +149,7 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*Private
 
 // DecryptPrivateKey converts an encrypted private key database model into a common private key.
 // password is the password used to derive a Key Encryption Key (KEK).
-func DecryptPrivateKey(privateKey *PrivateKey, password string) (*common.PrivateKey, error) {
+func DecryptPrivateKey(privateKey *PrivateKey, password string, salt []byte) (*common.PrivateKey, error) {
 
 	// Decode hex encoded key into a byte slice
 	encryptedDEK, err := hex.DecodeString(privateKey.DataEncryptionKey)

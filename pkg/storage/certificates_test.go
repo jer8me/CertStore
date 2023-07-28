@@ -7,6 +7,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
+	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -161,15 +162,16 @@ func TestGetAttributes(t *testing.T) {
 func TestEncryptDecryptPrivateKey(t *testing.T) {
 	// Generate a KEK (Key Encryption Key)
 	password := "password123"
+	salt := common.GenerateCryptoRandom(8)
 
 	// Read private key file
 	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
 	require.NoError(t, err, "failed to read RSA private key")
 
-	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password)
+	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password, salt)
 	require.NoError(t, err, "failed to encrypt private key")
 
-	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password)
+	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password, salt)
 	require.NoError(t, err, "failed to encrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
