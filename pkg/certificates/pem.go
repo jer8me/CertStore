@@ -1,42 +1,74 @@
 package certificates
 
 import (
+	"crypto"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
+	"github.com/jer8me/CertStore/pkg/common"
 	"os"
+	"strings"
 )
 
-// ParsePEMFile reads the named PEM file and returns a Certificate structure.
-// A successful call returns a nil error and a valid certificate.
-// An error returns a nil certificate and a wrapped error.
-func ParsePEMFile(filename string) (*x509.Certificate, error) {
-	// Load certificate content into memory
-	bytes, err := os.ReadFile(filename) // just pass the file name
+const (
+	RsaPrivateKey = "RSA PRIVATE KEY"
+	EcPrivateKey  = "EC PRIVATE KEY"
+	PrivateKey    = "PRIVATE KEY"
+)
+
+// ParsePEMFile reads the named PEM file and returns a slice of certificates and private keys.
+// A successful call returns a nil error.
+// The following private key formats are supported:
+//   - RSA / PKCS1
+//   - RSA / PKCS8
+//   - ECDSA / SEC1
+//   - ECDSA / PKCS8
+//   - ED25519 / PKCS8
+func ParsePEMFile(filename string) ([]*x509.Certificate, []*common.PrivateKey, error) {
+	// Load file content into memory
+	content, err := os.ReadFile(filename) // just pass the file name
 	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate %s: %w", filename, err)
+		return nil, nil, fmt.Errorf("failed to read file %s: %w", filename, err)
 	}
-	block, rest := pem.Decode(bytes)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM data for file %s: %w", filename, err)
+	var certificates []*x509.Certificate
+	var privateKeys []*common.PrivateKey
+	for len(content) > 0 {
+		var block *pem.Block
+		block, content = pem.Decode(content)
+		if block == nil {
+			continue
+		}
+		if strings.Contains(block.Type, PrivateKey) {
+			// Private key
+			var privateKey crypto.PrivateKey
+			switch block.Type {
+			case RsaPrivateKey:
+				privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			case EcPrivateKey:
+				privateKey, err = x509.ParseECPrivateKey(block.Bytes)
+			default:
+				privateKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+			}
+			if err != nil {
+				return certificates, privateKeys, fmt.Errorf("failed to parse private key %s: %w", filename, err)
+			}
+			privateKeys = append(privateKeys, common.NewPrivateKey(block.Type, privateKey))
+		} else {
+			// Certificate
+			certificate, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return certificates, privateKeys, fmt.Errorf("failed to parse certificate for file %s: %w", filename, err)
+			}
+			certificates = append(certificates, certificate)
+		}
 	}
-	// If the file contains a single certificate, we should not have any leftover bytes here.
-	// For now, log the case when there is more data in the file.
-	if len(rest) > 0 {
-		log.Printf("certificate file %s had %d bytes left", filename, len(rest))
-	}
-	certificate, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate for file %s: %w", filename, err)
-	}
-	return certificate, nil
+	return certificates, privateKeys, nil
 }
 
-// WritePEMFile writes a x509 certificate to a PEM encoded file.
+// WriteCertificate writes a x509 certificate to a PEM encoded file.
 // Returns an error if the certificate is invalid or if it fails to write the file.
-// If the file already exists, WritePEMFile returns an os.ErrExist error.
-func WritePEMFile(filename string, certificate *x509.Certificate) error {
+// If the file already exists, WriteCertificate returns an os.ErrExist error.
+func WriteCertificate(filename string, certificate *x509.Certificate) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 06444)
 	if err != nil {
 		return err

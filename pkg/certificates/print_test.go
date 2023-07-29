@@ -44,10 +44,12 @@ func TestPrintHex(t *testing.T) {
 
 func TestPrintCertificate(t *testing.T) {
 
-	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
 	require.NoError(t, err, "failed to parse certificate")
+	assert.Nil(t, privateKeys, "unexpected private key found")
+	assert.Len(t, certs, 1, "expected exactly one certificate")
 
-	certificate := storage.ToCertificate(x509cert)
+	certificate := storage.ToCertificate(certs[0])
 
 	var sb strings.Builder
 	certificates.PrintCertificate(&sb, certificate)

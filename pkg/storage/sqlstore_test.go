@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,8 +59,11 @@ func TestGetCertificate(t *testing.T) {
 	clearDb(t, db)
 
 	// Read certificate file
-	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
 	require.NoError(t, err, "failed to read certificate file")
+	assert.Nil(t, privateKeys, "unexpected private keys found")
+	assert.Len(t, certs, 1, "expected exactly one certificate")
+	x509cert := certs[0]
 
 	// Store certificate in database
 	certificateId, err := storage.StoreX509Certificate(db, x509cert)
@@ -77,12 +79,13 @@ func TestGetCertificate(t *testing.T) {
 func TestStoreCertificate(t *testing.T) {
 
 	// Read certificate
-	x509cert, err := certificates.ParsePEMFile(certPath("champlain.crt"))
-	if err != nil {
-		require.NoError(t, err, "failed to read certificate")
-	}
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	require.NoError(t, err, "failed to read certificate file")
+	assert.Nil(t, privateKeys, "unexpected private keys found")
+	assert.Len(t, certs, 1, "expected exactly one certificate")
+
 	// Transform x509 certificate to certificate DB model
-	certificate := storage.ToCertificate(x509cert)
+	certificate := storage.ToCertificate(certs[0])
 
 	// Connect to database
 	db := openMySql(t)
@@ -292,13 +295,15 @@ func TestStorePrivateKey(t *testing.T) {
 	clearDb(t, db)
 
 	password := "password123"
-	salt := common.GenerateCryptoRandom(8)
 
 	// Read private key file
-	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
-	require.NoError(t, err, "failed to read RSA private key")
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("rsa2048.key"))
+	require.NoError(t, err, "failed to read private keys")
+	assert.Nil(t, certs, "unexpected certificates found")
+	assert.Len(t, privateKeys, 1, "expected exactly one private key")
+	rsaPrivateKey := privateKeys[0]
 
-	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password, salt)
+	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password)
 	require.NoError(t, err, "failed to encrypt private key")
 
 	// Store private key in database
@@ -310,7 +315,7 @@ func TestStorePrivateKey(t *testing.T) {
 	require.NoError(t, err, "failed to get private key")
 
 	// Decrypt private key fetched from database
-	privateKey, err := storage.DecryptPrivateKey(privateKeyFound, password, salt)
+	privateKey, err := storage.DecryptPrivateKey(privateKeyFound, password)
 	require.NoError(t, err, "failed to decrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)

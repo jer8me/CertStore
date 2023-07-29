@@ -3,7 +3,8 @@ package certstore
 import "github.com/spf13/cobra"
 
 const (
-	idFlag = "id" // Flag used to specify a certificate id
+	idFlag  = "id" // Flag used to specify a certificate id
+	pwdFlag = "pwd"
 )
 
 var certificateId int64

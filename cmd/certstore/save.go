@@ -33,7 +33,7 @@ func saveCertificate(cmd *cobra.Command, args []string) error {
 	}
 	// Save certificate to file
 	filename := args[0]
-	err = certificates.WritePEMFile(filename, x509Certificate)
+	err = certificates.WriteCertificate(filename, x509Certificate)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write certificate file %s: %v\n", filename, err)
 		os.Exit(1)

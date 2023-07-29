@@ -1,12 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
 	"encoding/asn1"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -80,6 +82,15 @@ const (
 	Subject = "Subject"
 )
 
+const (
+	dekKeyLen    = 32
+	saltLen      = 8
+	scrpytN      = 32768
+	scrpytR      = 8
+	scrpytP      = 1
+	scrpytKeyLen = 32
+)
+
 // ToCertificate converts a x509 certificate into a certificate database model
 func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 	return &Certificate{
@@ -104,22 +115,30 @@ func ToCertificate(x509certificate *x509.Certificate) *Certificate {
 
 // EncryptPrivateKey converts a PrivateKey into an encrypted private key database model
 // password is the password used to derive a Key Encryption Key (KEK).
-func EncryptPrivateKey(privateKey *common.PrivateKey, password string, salt []byte) (*PrivateKey, error) {
+func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*PrivateKey, error) {
 
 	// Generate a unique encryption key for this private key
-	dek := common.GenerateCryptoRandom(32)
+	dek := common.GenerateCryptoRandom(dekKeyLen)
+
+	// Generate salt for key derivation
+	salt := common.GenerateCryptoRandom(saltLen)
 
 	// Compute a derived Key Encryption Key (KEK) from the password provided
-	derivedKey, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	kek, err := scrypt.Key([]byte(password), salt, scrpytN, scrpytR, scrpytP, scrpytKeyLen)
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt the DEK (data encryption key) with the derived KEK (key encryption key)
-	encryptedDEK, err := common.EncryptGCM(dek, derivedKey)
+	encryptedDEK, err := common.EncryptGCM(dek, kek)
 	if err != nil {
 		return nil, err
 	}
+	// Store salt next to data encryption key - format [SALT_LEN][SALT][DEK]
+	dekBuffer := make([]byte, 0, binary.MaxVarintLen64+saltLen+len(encryptedDEK))
+	dekBuffer = binary.AppendUvarint(dekBuffer, saltLen)
+	dekBuffer = append(dekBuffer, salt...)
+	dekBuffer = append(dekBuffer, encryptedDEK...)
 
 	// Marshal private key into a byte slice in PKCS 8 form
 	pkcs8, err := x509.MarshalPKCS8PrivateKey(privateKey.PrivateKey)
@@ -142,29 +161,36 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, password string, salt []by
 		EncryptedPKCS8:    encryptedPKCS8,
 		Type:              privateKey.Type(),
 		PEMType:           privateKey.PEMType,
-		DataEncryptionKey: hex.EncodeToString(encryptedDEK),
+		DataEncryptionKey: hex.EncodeToString(dekBuffer),
 		SHA256Fingerprint: hex.EncodeToString(sha256Sum[:]),
 	}, nil
 }
 
 // DecryptPrivateKey converts an encrypted private key database model into a common private key.
 // password is the password used to derive a Key Encryption Key (KEK).
-func DecryptPrivateKey(privateKey *PrivateKey, password string, salt []byte) (*common.PrivateKey, error) {
+func DecryptPrivateKey(privateKey *PrivateKey, password string) (*common.PrivateKey, error) {
 
 	// Decode hex encoded key into a byte slice
-	encryptedDEK, err := hex.DecodeString(privateKey.DataEncryptionKey)
+	dekBytes, err := hex.DecodeString(privateKey.DataEncryptionKey)
 	if err != nil {
 		return nil, err
 	}
-
-	// Compute a derived Key Encryption Key (KEK) from the password provided
-	derivedKey, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	dekBuffer := bytes.NewBuffer(dekBytes)
+	// sn is the length of the salt
+	sn, err := binary.ReadUvarint(dekBuffer)
+	if err != nil {
+		return nil, err
+	}
+	n := int(sn)
+	// Compute a derived Key Encryption Key (KEK) from the password provided.
+	// Next will consume the salt and only leave the encrypted DEK as unread in the buffer.
+	derivedKey, err := scrypt.Key([]byte(password), dekBuffer.Next(n), scrpytN, scrpytR, scrpytP, scrpytKeyLen)
 	if err != nil {
 		return nil, err
 	}
 
 	// Decrypt the DEK (Data Encryption Key) with the KEK (Key Encryption Key)
-	dek, err := common.DecryptGCM(encryptedDEK, derivedKey)
+	dek, err := common.DecryptGCM(dekBuffer.Bytes(), derivedKey)
 
 	// Decrypt the PKCS8 private key with the DEK
 	pkcs8, err := common.DecryptGCM(privateKey.EncryptedPKCS8, dek)

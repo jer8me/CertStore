@@ -29,14 +29,16 @@ func TestParsePrivateKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := certificates.ParsePrivateKey(tt.filename)
+			certs, privateKeys, err := certificates.ParsePEMFile(tt.filename)
 			if !tt.wantErr(t, err, fmt.Sprintf("ParsePrivateKey(%v)", tt.filename)) {
 				return
 			}
 			if err != nil {
 				return
 			}
-			privateKey := got.PrivateKey
+			assert.Nil(t, certs, "unexpected certificates found")
+			assert.Len(t, privateKeys, 1, "expected exactly one private key")
+			privateKey := privateKeys[0].PrivateKey
 			assert.IsType(t, tt.wantType, privateKey)
 			switch privateKey := privateKey.(type) {
 			case *rsa.PrivateKey:
@@ -46,7 +48,7 @@ func TestParsePrivateKey(t *testing.T) {
 			case *ecdsa.PrivateKey:
 				assert.Equal(t, privateKey.Curve.Params().Name, "P-521")
 			default:
-				assert.Fail(t, "invalid private key type", "unknown private key type: %T", got)
+				assert.Fail(t, "invalid private key type", "unknown private key type: %T", privateKey)
 			}
 		})
 	}
@@ -71,12 +73,18 @@ func TestCheckPrivateKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			certpath := path.Join("testdata", tt.certfile)
-			x509Certificate, err := certificates.ParsePEMFile(certpath)
-			assert.NoError(t, err, "failed to load X.509 certificate")
+			certs, privateKeys, err := certificates.ParsePEMFile(certpath)
+			require.NoError(t, err, "failed to load X.509 certificate")
+			assert.Nil(t, privateKeys, "unexpected private key found")
+			assert.Len(t, certs, 1, "expected exactly one certificate")
+			x509Certificate := certs[0]
 
 			keypath := path.Join("testdata", tt.keyfile)
-			privateKey, err := certificates.ParsePrivateKey(keypath)
-			assert.NoError(t, err, "failed to load private key")
+			certs, privateKeys, err = certificates.ParsePEMFile(keypath)
+			require.NoError(t, err, "failed to load private key")
+			assert.Nil(t, certs, "unexpected certificates found")
+			assert.Len(t, privateKeys, 1, "expected exactly one private key")
+			privateKey := privateKeys[0]
 
 			err = certificates.CheckPrivateKey(x509Certificate, privateKey)
 			if tt.errContains == "" {
@@ -104,13 +112,15 @@ func TestReadWritePrivateKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filepath := path.Join("testdata", tt.filename)
-			privateKey, err := certificates.ParsePrivateKey(filepath)
+			certs, privateKeys, err := certificates.ParsePEMFile(filepath)
 			tt.wantErr(t, err, fmt.Sprintf("ParsePrivateKey(%v)", filepath))
 			if err != nil {
 				return
 			}
+			assert.Nil(t, certs, "unexpected certificates found")
+			assert.Len(t, privateKeys, 1, "expected exactly one private key")
 			outfile := path.Join(t.TempDir(), path.Base(tt.filename))
-			err = certificates.WritePrivateKey(outfile, privateKey)
+			err = certificates.WritePrivateKey(outfile, privateKeys[0])
 			require.NoError(t, err, "failed to write private key")
 			expected, err := os.ReadFile(filepath)
 			require.NoError(t, err, "failed to read original private key")

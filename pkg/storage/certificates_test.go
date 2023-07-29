@@ -7,7 +7,6 @@ import (
 	"encoding/asn1"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,17 +65,21 @@ func TestCertificateKeyUsage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			x509certificate, err := certificates.ParsePEMFile(tt.filename)
+			certs, privateKeys, err := certificates.ParsePEMFile(tt.filename)
 			require.NoError(t, err, "failed to parse certificate")
-			assert.Equalf(t, tt.want, storage.GetKeyUsages(x509certificate), "GetKeyUsages(%v)", tt.filename)
+			assert.Nil(t, privateKeys, "unexpected private key found")
+			assert.Len(t, certs, 1, "expected exactly one certificate")
+			assert.Equalf(t, tt.want, storage.GetKeyUsages(certs[0]), "GetKeyUsages(%v)", tt.filename)
 		})
 	}
 }
 
 func TestToCertificate(t *testing.T) {
 
-	certificate, err := certificates.ParsePEMFile(certPath("champlain.crt"))
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
 	require.NoError(t, err, "failed to parse certificate")
+	require.Nil(t, privateKeys, "unexpected private key found")
+	require.Len(t, certs, 1, "expected exactly one certificate")
 
 	tests := []struct {
 		name    string
@@ -84,7 +87,7 @@ func TestToCertificate(t *testing.T) {
 		want    *storage.Certificate
 		wantErr assert.ErrorAssertionFunc
 	}{
-		{"TestValidCertificate", certificate, nil, assert.NoError},
+		{"TestValidCertificate", certs[0], nil, assert.NoError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -162,16 +165,18 @@ func TestGetAttributes(t *testing.T) {
 func TestEncryptDecryptPrivateKey(t *testing.T) {
 	// Generate a KEK (Key Encryption Key)
 	password := "password123"
-	salt := common.GenerateCryptoRandom(8)
 
 	// Read private key file
-	rsaPrivateKey, err := certificates.ParsePrivateKey(certPath("rsa2048.key"))
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath("rsa2048.key"))
 	require.NoError(t, err, "failed to read RSA private key")
+	assert.Nil(t, certs, "unexpected certificate found")
+	assert.Len(t, privateKeys, 1, "expected exactly one private key")
 
-	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password, salt)
+	rsaPrivateKey := privateKeys[0]
+	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password)
 	require.NoError(t, err, "failed to encrypt private key")
 
-	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password, salt)
+	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password)
 	require.NoError(t, err, "failed to decrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)
