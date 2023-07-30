@@ -4,9 +4,12 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"io"
 	"log"
 )
+
+var AuthError = errors.New("authentication error")
 
 // GenerateCryptoRandom generates cryptographically random bytes of the size specified.
 // For AES encryption, the size should be 16, 24, or 32 bytes to select AES-128, AES-192, or AES-256.
@@ -59,6 +62,9 @@ func DecryptGCM(ciphertext []byte, key []byte) ([]byte, error) {
 	nonce := ciphertext[0:aesgcm.NonceSize()]
 	// Decrypt and authenticate ciphertext
 	plaintext, err := aesgcm.Open(nil, nonce, ciphertext[aesgcm.NonceSize():], nil)
-
-	return plaintext, err
+	if err != nil {
+		// The message could not be authenticated: wrap the error in an AuthError
+		return nil, errors.Join(AuthError, err)
+	}
+	return plaintext, nil
 }
