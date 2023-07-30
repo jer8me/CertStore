@@ -193,6 +193,9 @@ func DecryptPrivateKey(privateKey *PrivateKey, password string) (*common.Private
 
 	// Decrypt the DEK (Data Encryption Key) with the KEK (Key Encryption Key)
 	dek, err := common.DecryptGCM(dekBuffer.Bytes(), derivedKey)
+	if err != nil {
+		return nil, err
+	}
 
 	// Decrypt the PKCS8 private key with the DEK
 	pkcs8, err := common.DecryptGCM(privateKey.EncryptedPKCS8, dek)
