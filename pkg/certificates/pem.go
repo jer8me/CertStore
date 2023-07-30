@@ -69,7 +69,7 @@ func ParsePEMFile(filename string) ([]*x509.Certificate, []*common.PrivateKey, e
 // Returns an error if the certificate is invalid or if it fails to write the file.
 // If the file already exists, WriteCertificate returns an os.ErrExist error.
 func WriteCertificate(filename string, certificate *x509.Certificate) error {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 06444)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}

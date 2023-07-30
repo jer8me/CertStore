@@ -75,7 +75,7 @@ func WritePrivateKey(filename string, privateKey *common.PrivateKey) error {
 		return err
 	}
 
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 06444)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return err
 	}
