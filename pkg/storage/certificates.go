@@ -64,6 +64,7 @@ type SANType struct {
 type PrivateKey struct {
 	Id                int64
 	EncryptedPKCS8    []byte
+	PublicKey         []byte
 	Type              string
 	PEMType           string
 	DataEncryptionKey string
@@ -159,6 +160,7 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*Private
 
 	return &PrivateKey{
 		EncryptedPKCS8:    encryptedPKCS8,
+		PublicKey:         publicKey,
 		Type:              privateKey.Type(),
 		PEMType:           privateKey.PEMType,
 		DataEncryptionKey: hex.EncodeToString(dekBuffer),

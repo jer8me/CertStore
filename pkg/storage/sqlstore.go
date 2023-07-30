@@ -304,9 +304,9 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey) (int64, error) {
 		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 	}
 
-	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, privateKeyType_id, pemType, sha256Fingerprint,"+
-		"dataEncryptionKey) VALUE (?, ?, ?, ?, ?)", privateKey.EncryptedPKCS8, privateKeyTypeId, privateKey.PEMType,
-		privateKey.SHA256Fingerprint, privateKey.DataEncryptionKey)
+	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, publicKey, privateKeyType_id, pemType, "+
+		"sha256Fingerprint, dataEncryptionKey) VALUE (?, ?, ?, ?, ?, ?)", privateKey.EncryptedPKCS8, privateKey.PublicKey,
+		privateKeyTypeId, privateKey.PEMType, privateKey.SHA256Fingerprint, privateKey.DataEncryptionKey)
 	if err != nil {
 		return 0, err
 	}

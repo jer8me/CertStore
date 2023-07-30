@@ -63,6 +63,7 @@ DROP TABLE IF EXISTS PrivateKey;
 CREATE TABLE IF NOT EXISTS PrivateKey (
   id INT NOT NULL AUTO_INCREMENT,
   encryptedPkcs8 BLOB NOT NULL,
+  publicKey BLOB NOT NULL,
   privateKeyType_id INT NOT NULL,
   pemType VARCHAR(64) NOT NULL,
   dataEncryptionKey VARCHAR(256) NOT NULL,
