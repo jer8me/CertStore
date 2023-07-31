@@ -1,13 +1,17 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 )
 
 func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
@@ -146,9 +150,13 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 	// Defer transaction rollback in case anything fails.
 	defer tx.Rollback()
 
-	// Compute SHA-256 Fingerprint
+	// Compute certificate SHA-256 Fingerprint
 	sha256Sum := sha256.Sum256(cert.RawContent)
 	sha256Fingerprint := hex.EncodeToString(sha256Sum[:])
+
+	// Compute public key SHA-256 Fingerprint
+	sha256Sum = sha256.Sum256(cert.PublicKey)
+	sha256PublicKey := hex.EncodeToString(sha256Sum[:])
 
 	// Check if this certificate already exists in the database
 	var certificateId int64
@@ -163,9 +171,9 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 	// Create a new row in the album_order table.
 	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
 		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent, "+
-		"sha256Fingerprint) VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", cert.PublicKey, publicKeyAlgorithmId,
-		cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, cert.NotBefore, cert.NotAfter,
-		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint)
+		"sha256Fingerprint, sha256PublicKey) VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", cert.PublicKey,
+		publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, cert.NotBefore, cert.NotAfter,
+		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint, sha256PublicKey)
 	if err != nil {
 		return 0, err
 	}
@@ -275,7 +283,7 @@ func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error)
 	return StoreCertificate(db, certificate)
 }
 
-func StorePrivateKey(db *sql.DB, privateKey *PrivateKey) (int64, error) {
+func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, error) {
 
 	// Get private key type ID
 	privateKeyTypeId, err := GetPrivateKeyTypeId(db, privateKey.Type)
@@ -304,6 +312,18 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey) (int64, error) {
 		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 	}
 
+	var certificateIds []int64
+	if linkCert {
+		// Only store the private key if we can find one or more matching certificate
+		certificateIds, err = FindCertificateByPublicKey(tx, privateKey.PublicKey)
+		if err != nil {
+			return 0, err
+		}
+		if len(certificateIds) == 0 {
+			return 0, errors.New("cannot store private key, no matching certificate found")
+		}
+	}
+
 	result, err := tx.Exec("INSERT INTO PrivateKey (encryptedPkcs8, publicKey, privateKeyType_id, pemType, "+
 		"sha256Fingerprint, dataEncryptionKey) VALUE (?, ?, ?, ?, ?, ?)", privateKey.EncryptedPKCS8, privateKey.PublicKey,
 		privateKeyTypeId, privateKey.PEMType, privateKey.SHA256Fingerprint, privateKey.DataEncryptionKey)
@@ -316,12 +336,67 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey) (int64, error) {
 		return 0, err
 	}
 
+	if len(certificateIds) > 0 {
+		// Update all corresponding certificates with the private key ID
+		var query strings.Builder
+		query.WriteString("UPDATE Certificate SET privateKey_id = ? WHERE id IN(")
+		for i, certificateId := range certificateIds {
+			if i > 0 {
+				query.WriteByte(',')
+			}
+			query.WriteString(strconv.FormatInt(certificateId, 10))
+		}
+		query.WriteByte(')')
+
+		_, err = tx.Exec(query.String(), privateKeyId)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	// Commit the transaction.
 	if err = tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit StorePrivateKey transaction: %w", err)
 	}
 
 	return privateKeyId, nil
+}
+
+// FindCertificateByPublicKey returns a slice of certificate IDs with the public key provided
+func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
+	// Compute SHA256
+	sha256Sum := sha256.Sum256(publicKey)
+	sha256Hex := hex.EncodeToString(sha256Sum[:])
+
+	rows, err := tx.Query("SELECT id, publicKey FROM Certificate WHERE sha256PublicKey = ?", sha256Hex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Slice of certificate IDs matching this private key's public key
+	var certificateIds []int64
+	for rows.Next() {
+		var certificateId int64
+		var certPublicKey []byte
+		if err := rows.Scan(&certificateId, &certPublicKey); err != nil {
+			return nil, err
+		}
+		if bytes.Equal(publicKey, certPublicKey) {
+			// Found a certificate matching this public key
+			certificateIds = append(certificateIds, certificateId)
+		}
+	}
+	// Close rows
+	rerr := rows.Close()
+	if rerr != nil {
+		return nil, rerr
+	}
+	// Rows.Err reports the last error encountered by Rows.Scan.
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return certificateIds, nil
 }
 
 func GetPrivateKey(db *sql.DB, privateKeyId int64) (*PrivateKey, error) {

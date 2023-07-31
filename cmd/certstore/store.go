@@ -68,7 +68,7 @@ func storeCertificate(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
 			continue
 		}
-		privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey)
+		privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey, true)
 		if err == nil {
 			fmt.Printf("%s private key successfully stored (private key ID=%d)\n", privateKey.Type(), privateKeyId)
 		} else {

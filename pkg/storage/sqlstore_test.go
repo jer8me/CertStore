@@ -307,7 +307,7 @@ func TestStorePrivateKey(t *testing.T) {
 	require.NoError(t, err, "failed to encrypt private key")
 
 	// Store private key in database
-	privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey)
+	privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey, false)
 	require.NoError(t, err, "failed to store private key")
 
 	// Read stored encrypted private key
