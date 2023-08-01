@@ -63,10 +63,9 @@ func TestGetCertificate(t *testing.T) {
 	require.NoError(t, err, "failed to read certificate file")
 	assert.Nil(t, privateKeys, "unexpected private keys found")
 	assert.Len(t, certs, 1, "expected exactly one certificate")
-	x509cert := certs[0]
 
 	// Store certificate in database
-	certificateId, err := storage.StoreX509Certificate(db, x509cert)
+	certificateId, err := storage.StoreCertificate(db, storage.ToCertificate(certs[0]), false)
 	require.NoError(t, err, "failed to store certificate")
 
 	cert, err := storage.GetCertificate(db, certificateId)
@@ -92,7 +91,7 @@ func TestStoreCertificate(t *testing.T) {
 	defer db.Close()
 	clearDb(t, db)
 
-	certificateId, err := storage.StoreCertificate(db, certificate)
+	certificateId, err := storage.StoreCertificate(db, certificate, false)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}

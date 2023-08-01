@@ -115,7 +115,7 @@ func GetCertificates(db *sql.DB) ([]*Certificate, error) {
 	return certificates, nil
 }
 
-func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
+func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, error) {
 
 	// Get public key algorithm ID for string
 	publicKeyAlgorithmId, err := GetPublicKeyAlgorithmId(db, cert.PublicKeyAlgorithm)
@@ -165,12 +165,24 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 		return 0, fmt.Errorf("failed to query certificate by SHA-256 fingerprint: %w", err)
 	}
 
+	var privateKeyId sql.NullInt64
+	if linkCert {
+		// Check if this certificate corresponds to a known private key
+		err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", sha256PublicKey).Scan(&privateKeyId)
+		if err == sql.ErrNoRows {
+			privateKeyId.Valid = false
+		} else if err != nil {
+			// Query error
+			return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
+		}
+	}
+
 	// Create a new row in the album_order table.
 	result, err := tx.ExecContext(ctx, "INSERT INTO Certificate (publicKey, publicKeyAlgorithm_id, version, "+
 		"serialNumber, subject, issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent, "+
-		"sha256Fingerprint, sha256PublicKey) VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", cert.PublicKey,
+		"sha256Fingerprint, sha256PublicKey, privateKey_id) VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", cert.PublicKey,
 		publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, cert.NotBefore, cert.NotAfter,
-		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint, sha256PublicKey)
+		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint, sha256PublicKey, privateKeyId)
 	if err != nil {
 		return 0, err
 	}
@@ -277,7 +289,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error) {
 	// Transform x509 certificate to certificate DB model
 	certificate := ToCertificate(x509cert)
-	return StoreCertificate(db, certificate)
+	return StoreCertificate(db, certificate, true)
 }
 
 func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, error) {

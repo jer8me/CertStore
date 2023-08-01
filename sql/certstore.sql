@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS Certificate (
   INDEX (signatureAlgorithm_id ASC),
   INDEX (privateKey_id ASC),
   INDEX (sha256Fingerprint ASC),
+  INDEX (sha256PublicKey ASC),
   CONSTRAINT fk_Certificate_PublicKeyAlgorithm
     FOREIGN KEY (publicKeyAlgorithm_id)
     REFERENCES PublicKeyAlgorithm (id),
