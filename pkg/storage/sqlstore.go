@@ -86,7 +86,7 @@ func GetX509Certificate(db *sql.DB, certificateId int64) (*x509.Certificate, err
 
 func GetCertificates(db *sql.DB) ([]*Certificate, error) {
 	rows, err := db.Query("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, " +
-		"c.notAfter, c.isCa FROM Certificate c " +
+		"c.notAfter, c.isCa, c.privateKey_id FROM Certificate c " +
 		"INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id")
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func GetCertificates(db *sql.DB) ([]*Certificate, error) {
 	for rows.Next() {
 		cert := &Certificate{}
 		if err := rows.Scan(&cert.Id, &cert.PublicKeyAlgorithm, &cert.Version, &cert.SerialNumber,
-			&cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter, &cert.IsCA); err != nil {
+			&cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter, &cert.IsCA, &cert.PrivateKeyId); err != nil {
 			// Error happened while scanning rows: return the rows we scanned so far and the error
 			return certificates, err
 		}
