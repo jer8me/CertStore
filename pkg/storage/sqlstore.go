@@ -3,12 +3,11 @@ package storage
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"crypto/x509"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 	"strconv"
 	"strings"
@@ -151,12 +150,10 @@ func StoreCertificate(db *sql.DB, cert *Certificate) (int64, error) {
 	defer tx.Rollback()
 
 	// Compute certificate SHA-256 Fingerprint
-	sha256Sum := sha256.Sum256(cert.RawContent)
-	sha256Fingerprint := hex.EncodeToString(sha256Sum[:])
+	sha256Fingerprint := common.SHA256Hex(cert.RawContent)
 
 	// Compute public key SHA-256 Fingerprint
-	sha256Sum = sha256.Sum256(cert.PublicKey)
-	sha256PublicKey := hex.EncodeToString(sha256Sum[:])
+	sha256PublicKey := common.SHA256Hex(cert.PublicKey)
 
 	// Check if this certificate already exists in the database
 	var certificateId int64
@@ -364,11 +361,10 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 
 // FindCertificateByPublicKey returns a slice of certificate IDs with the public key provided
 func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
-	// Compute SHA256
-	sha256Sum := sha256.Sum256(publicKey)
-	sha256Hex := hex.EncodeToString(sha256Sum[:])
+	// Compute SHA-256
+	sha256PublicKey := common.SHA256Hex(publicKey)
 
-	rows, err := tx.Query("SELECT id, publicKey FROM Certificate WHERE sha256PublicKey = ?", sha256Hex)
+	rows, err := tx.Query("SELECT id, publicKey FROM Certificate WHERE sha256PublicKey = ?", sha256PublicKey)
 	if err != nil {
 		return nil, err
 	}

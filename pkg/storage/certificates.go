@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"crypto"
-	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
@@ -156,15 +155,13 @@ func EncryptPrivateKey(privateKey *common.PrivateKey, password string) (*Private
 	if err != nil {
 		return nil, err
 	}
-	sha256Sum := sha256.Sum256(publicKey)
-
 	return &PrivateKey{
 		EncryptedPKCS8:    encryptedPKCS8,
 		PublicKey:         publicKey,
 		Type:              privateKey.Type(),
 		PEMType:           privateKey.PEMType,
 		DataEncryptionKey: hex.EncodeToString(dekBuffer),
-		SHA256Fingerprint: hex.EncodeToString(sha256Sum[:]),
+		SHA256Fingerprint: common.SHA256Hex(publicKey),
 	}, nil
 }
 
@@ -215,8 +212,8 @@ func DecryptPrivateKey(privateKey *PrivateKey, password string) (*common.Private
 
 // GetSerialNumber returns the serial number of the certificate as a hex string
 func GetSerialNumber(x509certificate *x509.Certificate) string {
-	bytes := x509certificate.SerialNumber.Bytes()
-	return hex.EncodeToString(bytes)
+	serialNumberBytes := x509certificate.SerialNumber.Bytes()
+	return hex.EncodeToString(serialNumberBytes)
 }
 
 // GetAttributes extracts the attribute types and values from an X.509 distinguished name.
