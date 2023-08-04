@@ -37,11 +37,14 @@ func checkFlags(cmd *cobra.Command, args []string) error {
 }
 
 func save(cmd *cobra.Command, args []string) error {
-	db, err := openMySqlDB()
+	db, err := openSQLite()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeSQLite(db)
+	if err := initSQLite(db); err != nil {
+		return err
+	}
 
 	if cmd.Flags().Lookup(certIdFlag).Changed {
 		// Save certificate to file
@@ -99,7 +102,6 @@ func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) e
 }
 
 func init() {
-	addMySqlFlags(saveCmd)
 	addIdFlag(saveCmd, false)
 	saveCmd.Flags().Int64VarP(&privateKeyId, pkIdFlag, "k", 0, "Private Key ID")
 	saveCmd.Flags().StringP(pwdFlag, "p", "", "Private Key encryption password")

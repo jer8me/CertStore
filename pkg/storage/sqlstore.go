@@ -146,8 +146,6 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 	if err != nil {
 		return 0, err
 	}
-	// Defer transaction rollback in case anything fails.
-	defer tx.Rollback()
 
 	// Compute certificate SHA-256 Fingerprint
 	sha256Fingerprint := common.SHA256Hex(cert.RawContent)
@@ -160,8 +158,10 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 	err = tx.QueryRow("SELECT id FROM Certificate WHERE sha256Fingerprint = ?", sha256Fingerprint).Scan(&certificateId)
 	if err == nil {
 		// Found matching certificate: return id
+		rollback(tx)
 		return certificateId, nil
 	} else if err != sql.ErrNoRows {
+		rollback(tx)
 		return 0, fmt.Errorf("failed to query certificate by SHA-256 fingerprint: %w", err)
 	}
 
@@ -173,6 +173,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 			privateKeyId.Valid = false
 		} else if err != nil {
 			// Query error
+			rollback(tx)
 			return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 		}
 	}
@@ -184,11 +185,13 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 		publicKeyAlgorithmId, cert.Version, cert.SerialNumber, cert.SubjectCN, cert.IssuerCN, cert.NotBefore, cert.NotAfter,
 		cert.Signature, signatureAlgorithmId, cert.IsCA, cert.RawContent, sha256Fingerprint, sha256PublicKey, privateKeyId)
 	if err != nil {
+		rollback(tx)
 		return 0, err
 	}
 	// Get certificate ID from INSERT
 	certificateId, err = result.LastInsertId()
 	if err != nil {
+		rollback(tx)
 		return 0, err
 	}
 	// Associate key usages with certificate
@@ -197,15 +200,18 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 		var keyUsageId int
 		err = tx.QueryRow("SELECT id FROM KeyUsage WHERE name = ?", keyUsage).Scan(&keyUsageId)
 		if err == sql.ErrNoRows {
+			rollback(tx)
 			return 0, fmt.Errorf("invalid key usage: %s", keyUsage)
 		}
 		if err != nil {
+			rollback(tx)
 			return 0, fmt.Errorf("failed to query key usage ID: %w", err)
 		}
 		// Insert
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateKeyUsage (certificate_id, keyUsage_id) VALUE (?, ?)",
 			certificateId, keyUsageId)
 		if err != nil {
+			rollback(tx)
 			return 0, fmt.Errorf("failed to insert CertificateKeyUsage: %w", err)
 		}
 	}
@@ -219,6 +225,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
 			"VALUE (?, ?, ?, ?)", certificateId, Issuer, attribute.Oid, attribute.Value)
 		if err != nil {
+			rollback(tx)
 			return 0, fmt.Errorf("failed to insert %s CertificateAttribute: %w", Issuer, err)
 		}
 	}
@@ -232,6 +239,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 		_, err = tx.ExecContext(ctx, "INSERT INTO CertificateAttribute (certificate_id, type, oid, value) "+
 			"VALUE (?, ?, ?, ?)", certificateId, Subject, attribute.Oid, attribute.Value)
 		if err != nil {
+			rollback(tx)
 			return 0, fmt.Errorf("failed to insert %s CertificateAttribute: %w", Subject, err)
 		}
 	}
@@ -261,17 +269,20 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 			result, err = tx.ExecContext(ctx, "INSERT INTO SubjectAlternateName (name, subjectAlternateNameType_id) "+
 				"VALUE (?, ?)", certSanValue, sanTypeId)
 			if err != nil {
+				rollback(tx)
 				return 0, err
 			}
 			// Get SubjectAlternateName ID from INSERT
 			sanId, err := result.LastInsertId()
 			if err != nil {
+				rollback(tx)
 				return 0, err
 			}
 			// Associate SAN ID with certificate
 			_, err = tx.ExecContext(ctx, "INSERT INTO CertificateSAN (certificate_id, subjectAlternateName_id) "+
 				"VALUE (?, ?)", certificateId, sanId)
 			if err != nil {
+				rollback(tx)
 				return 0, fmt.Errorf("failed to insert CertificateSAN: %w", err)
 			}
 		}
@@ -308,16 +319,16 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 	if err != nil {
 		return 0, err
 	}
-	// Defer transaction rollback in case anything fails.
-	defer tx.Rollback()
 
 	// Check if this private key already exists in the database
 	var privateKeyId int64
 	err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", privateKey.SHA256Fingerprint).Scan(&privateKeyId)
 	if err == nil {
 		// Found matching private key: return id
+		rollback(tx)
 		return privateKeyId, nil
 	} else if err != sql.ErrNoRows {
+		rollback(tx)
 		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 	}
 
@@ -326,9 +337,11 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 		// Only store the private key if we can find one or more matching certificate
 		certificateIds, err = FindCertificateByPublicKey(tx, privateKey.PublicKey)
 		if err != nil {
+			rollback(tx)
 			return 0, err
 		}
 		if len(certificateIds) == 0 {
+			rollback(tx)
 			return 0, errors.New("cannot store private key, no matching certificate found")
 		}
 	}
@@ -337,11 +350,13 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 		"sha256Fingerprint, dataEncryptionKey) VALUE (?, ?, ?, ?, ?, ?)", privateKey.EncryptedPKCS8, privateKey.PublicKey,
 		privateKeyTypeId, privateKey.PEMType, privateKey.SHA256Fingerprint, privateKey.DataEncryptionKey)
 	if err != nil {
+		rollback(tx)
 		return 0, err
 	}
 	// Get PrivateKey ID from INSERT
 	privateKeyId, err = result.LastInsertId()
 	if err != nil {
+		rollback(tx)
 		return 0, err
 	}
 
@@ -359,6 +374,7 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 
 		_, err = tx.Exec(query.String(), privateKeyId)
 		if err != nil {
+			rollback(tx)
 			return 0, err
 		}
 	}

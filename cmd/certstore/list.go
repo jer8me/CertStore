@@ -15,11 +15,14 @@ var listCmd = &cobra.Command{
 }
 
 func listCertificates(cmd *cobra.Command, args []string) error {
-	db, err := openMySqlDB()
+	db, err := openSQLite()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeSQLite(db)
+	if err := initSQLite(db); err != nil {
+		return err
+	}
 
 	// Fetch certificate
 	certs, err := storage.GetCertificates(db)
@@ -33,6 +36,5 @@ func listCertificates(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addMySqlFlags(listCmd)
 	rootCmd.AddCommand(listCmd)
 }

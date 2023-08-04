@@ -31,11 +31,14 @@ func ensureHostPort(addr string) (string, error) {
 }
 
 func fetchCertificates(cmd *cobra.Command, args []string) error {
-	db, err := openMySqlDB()
+	db, err := openSQLite()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeSQLite(db)
+	if err := initSQLite(db); err != nil {
+		return err
+	}
 
 	for _, address := range args {
 		address, err = ensureHostPort(address)
@@ -63,6 +66,5 @@ func fetchCertificates(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addMySqlFlags(dialCmd)
 	rootCmd.AddCommand(dialCmd)
 }

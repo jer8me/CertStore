@@ -41,11 +41,14 @@ func parseFiles(cmd *cobra.Command, args []string) error {
 }
 
 func storeCertificate(cmd *cobra.Command, args []string) error {
-	db, err := openMySqlDB()
+	db, err := openSQLite()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeSQLite(db)
+	if err := initSQLite(db); err != nil {
+		return err
+	}
 
 	// Store certificates in database
 	for _, cert := range certs {
@@ -79,7 +82,6 @@ func storeCertificate(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addMySqlFlags(storeCmd)
 	storeCmd.Flags().StringP(pwdFlag, "p", "", "Private key encryption password")
 	rootCmd.AddCommand(storeCmd)
 }

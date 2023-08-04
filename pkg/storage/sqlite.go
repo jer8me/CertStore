@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/jer8me/CertStore/pkg/common"
 	"log"
 	"os"
 	"path"
@@ -16,32 +17,27 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const (
-	dbDirectory = ".certstore"
-	dbFilename  = "certstore.db"
-)
-
 var whitespaces = regexp.MustCompile(`\s*\n\s*`)
 
 //go:embed sql/certstore.sql
 var dbScript []byte
 
 // OpenDatabase returns a DB object or an error if opening the database fails
-func OpenDatabase() (*sql.DB, error) {
-	homeDir, err := os.UserHomeDir()
+func OpenDatabase(filepath string) (*sql.DB, error) {
+	filepath, err := common.ResolvePath(filepath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+		return nil, err
 	}
-	certStoreDir := path.Join(homeDir, dbDirectory)
-	err = os.Mkdir(certStoreDir, 0600)
-	if err != nil && !os.IsExist(err) {
-		return nil, fmt.Errorf("failed to create certstore directory: %w", err)
+	dir, _ := path.Split(filepath)
+	if dir != "" {
+		err = os.MkdirAll(dir, 0600)
+		if err != nil {
+			return nil, err
+		}
 	}
-	dbPath := path.Join(certStoreDir, dbFilename)
-
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite3", filepath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, err
 	}
 	return db, nil
 }
@@ -61,18 +57,18 @@ func InitDatabase(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer rollback(tx)
 
 	var exists bool
 	err = tx.QueryRow("SELECT EXISTS(SELECT name FROM sqlite_schema WHERE type='table' AND name='Certificate')").Scan(&exists)
 	if err != nil {
+		rollback(tx)
 		return fmt.Errorf("failed to query sqlite schema: %w", err)
 	}
 	if exists {
 		// Certificate table exists: nothing to do
+		rollback(tx)
 		return nil
 	}
-	fmt.Println("Creating database for first use")
 
 	var builder strings.Builder
 	reader := bytes.NewReader(dbScript)
@@ -86,6 +82,7 @@ func InitDatabase(db *sql.DB) error {
 		builder.WriteByte('\n')
 	}
 	if err := scanner.Err(); err != nil {
+		rollback(tx)
 		return fmt.Errorf("failed to scan database script: %w", err)
 	}
 
@@ -97,7 +94,6 @@ func InitDatabase(db *sql.DB) error {
 		if trimmed == "" {
 			continue
 		}
-		log.Printf("EXECUTE: '%s'\n", trimmed)
 		if _, err := tx.Exec(trimmed); err != nil {
 			return fmt.Errorf("failed to execute database creation statement: %w", err)
 		}

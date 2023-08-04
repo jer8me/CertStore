@@ -4,59 +4,41 @@ import (
 	"crypto/rsa"
 	"database/sql"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
-	"os"
+	"path"
 	"strings"
 	"testing"
 )
 
 // Helper function to open a database connection
-func openMySql(t *testing.T) *sql.DB {
+func openDB(t *testing.T) *sql.DB {
+	dbpath := path.Join(t.TempDir(), "test.db")
 	// Connect to database
-	mysqlCfg := mysql.NewConfig()
-	mysqlCfg.User = os.Getenv("DB_USERNAME")
-	require.NotEmpty(t, mysqlCfg.User, "DB_USERNAME must be non-empty")
-	mysqlCfg.Passwd = os.Getenv("DB_PASSWORD")
-	require.NotEmpty(t, mysqlCfg.Passwd, "DB_PASSWORD must be non-empty")
-	mysqlCfg.DBName = os.Getenv("DB_NAME")
-	require.NotEmpty(t, mysqlCfg.DBName, "DB_NAME must be non-empty")
-	mysqlCfg.ParseTime = true
-
-	connector, err := mysql.NewConnector(mysqlCfg)
-	require.NoError(t, err, "failed to create database connector "+
-		"(db=%s, user=%s)", mysqlCfg.DBName, mysqlCfg.User)
-
-	return sql.OpenDB(connector)
+	db, err := storage.OpenDatabase(dbpath)
+	require.NoError(t, err, "failed to open database '%s'", dbpath)
+	return db
 }
 
-func clearDb(t *testing.T, db *sql.DB) {
-	sqlStatements := []string{
-		"DELETE FROM CertificateSAN",
-		"DELETE FROM SubjectAlternateName",
-		"DELETE FROM CertificateKeyUsage",
-		"DELETE FROM CertificateOwner",
-		"DELETE FROM CertificateAttribute",
-		"DELETE FROM Certificate",
-		"DELETE FROM PrivateKey",
-		"DELETE FROM User",
-	}
-	for _, sqlStatement := range sqlStatements {
-		_, err := db.Exec(sqlStatement)
-		require.NoError(t, err, "failed to setup database")
-	}
+func initDB(t *testing.T, db *sql.DB) {
+	err := storage.InitDatabase(db)
+	require.NoError(t, err, "failed to initialize database")
+}
+
+func closeDB(t *testing.T, db *sql.DB) {
+	err := db.Close()
+	require.NoError(t, err, "failed to close database")
 }
 
 func TestGetCertificate(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	// Read certificate file
 	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
@@ -87,9 +69,9 @@ func TestStoreCertificate(t *testing.T) {
 	certificate := storage.ToCertificate(certs[0])
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	certificateId, err := storage.StoreCertificate(db, certificate, false)
 	if err != nil {
@@ -101,9 +83,9 @@ func TestStoreCertificate(t *testing.T) {
 func TestGetPublicKeyAlgorithmId(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	tests := []struct {
 		name               string
@@ -136,9 +118,9 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 func TestGetPublicKeyAlgorithmName(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	tests := []struct {
 		name                 string
@@ -168,9 +150,9 @@ func TestGetPublicKeyAlgorithmName(t *testing.T) {
 func TestGetSignatureAlgorithmId(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	tests := []struct {
 		name               string
@@ -215,9 +197,9 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 func TestGetSignatureAlgorithmName(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	tests := []struct {
 		name                 string
@@ -246,9 +228,9 @@ func TestGetSignatureAlgorithmName(t *testing.T) {
 func TestGetSANTypes(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	sanTypes, err := storage.GetSANTypes(db)
 	if err != nil {
@@ -269,9 +251,9 @@ func TestGetSANTypes(t *testing.T) {
 func TestGetAttributeTypes(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	attributeTypes, err := storage.GetAttributeTypes(db)
 	if err != nil {
@@ -289,9 +271,9 @@ func TestGetAttributeTypes(t *testing.T) {
 func TestStorePrivateKey(t *testing.T) {
 
 	// Connect to database
-	db := openMySql(t)
-	defer db.Close()
-	clearDb(t, db)
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
 
 	password := "password123"
 
