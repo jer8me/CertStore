@@ -1,20 +1,11 @@
 -- -----------------------------------------------------
--- Schema certstore
--- -----------------------------------------------------
-
-DROP DATABASE IF EXISTS certstore;
-CREATE DATABASE IF NOT EXISTS certstore;
-USE certstore;
-
--- -----------------------------------------------------
 -- Table User
 -- -----------------------------------------------------
 DROP TABLE IF EXISTS User;
 
 CREATE TABLE IF NOT EXISTS User (
-  id INT NOT NULL,
-  name VARCHAR(64) NOT NULL,
-  PRIMARY KEY (id ASC)
+  id INTEGER PRIMARY KEY ASC,
+  name VARCHAR(64) NOT NULL
 );
 
 
@@ -24,11 +15,11 @@ CREATE TABLE IF NOT EXISTS User (
 DROP TABLE IF EXISTS PublicKeyAlgorithm;
 
 CREATE TABLE IF NOT EXISTS PublicKeyAlgorithm (
-  id INT NOT NULL,
-  name VARCHAR(32) NOT NULL,
-  PRIMARY KEY (id ASC),
-  UNIQUE (name ASC)
+  id INTEGER PRIMARY KEY ASC,
+  name VARCHAR(32) NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_PublicKeyAlgorithm_Name ON PublicKeyAlgorithm(name ASC);
 
 
 -- -----------------------------------------------------
@@ -37,9 +28,8 @@ CREATE TABLE IF NOT EXISTS PublicKeyAlgorithm (
 DROP TABLE IF EXISTS SignatureAlgorithm;
 
 CREATE TABLE IF NOT EXISTS SignatureAlgorithm (
-  id INT NOT NULL,
-  name VARCHAR(64) NULL,
-  PRIMARY KEY (id ASC)
+  id INTEGER PRIMARY KEY ASC,
+  name VARCHAR(64) NULL
 );
 
 
@@ -49,9 +39,8 @@ CREATE TABLE IF NOT EXISTS SignatureAlgorithm (
 DROP TABLE IF EXISTS PrivateKeyType;
 
 CREATE TABLE IF NOT EXISTS PrivateKeyType (
-  id INT NOT NULL,
-  type VARCHAR(64) NOT NULL,
-  PRIMARY KEY (id ASC)
+  id INTEGER PRIMARY KEY ASC,
+  type VARCHAR(64) NOT NULL
 );
 
 
@@ -61,20 +50,18 @@ CREATE TABLE IF NOT EXISTS PrivateKeyType (
 DROP TABLE IF EXISTS PrivateKey;
 
 CREATE TABLE IF NOT EXISTS PrivateKey (
-  id INT NOT NULL AUTO_INCREMENT,
+  id INTEGER PRIMARY KEY ASC,
   encryptedPkcs8 BLOB NOT NULL,
   publicKey BLOB NOT NULL,
-  privateKeyType_id INT NOT NULL,
+  privateKeyType_id INTEGER NOT NULL,
   pemType VARCHAR(64) NOT NULL,
   dataEncryptionKey VARCHAR(256) NOT NULL,
   sha256Fingerprint VARCHAR(64) NOT NULL,
-  PRIMARY KEY (id ASC),
-  INDEX (privateKeyType_id ASC),
-  INDEX (sha256Fingerprint ASC),
-  CONSTRAINT fk_PrivateKey_PrivateKeyType
-    FOREIGN KEY (privateKeyType_id)
-    REFERENCES PrivateKeyType (id)
+  CONSTRAINT fk_PrivateKey_PrivateKeyType FOREIGN KEY (privateKeyType_id) REFERENCES PrivateKeyType (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_PrivateKey_Type ON PrivateKey(privateKeyType_id ASC);
+CREATE INDEX IF NOT EXISTS idx_PrivateKey_SHA256Fingerprint ON PrivateKey(sha256Fingerprint ASC);
 
 
 -- -----------------------------------------------------
@@ -83,9 +70,9 @@ CREATE TABLE IF NOT EXISTS PrivateKey (
 DROP TABLE IF EXISTS Certificate;
 
 CREATE TABLE IF NOT EXISTS Certificate (
-  id INT NOT NULL AUTO_INCREMENT,
+  id INTEGER PRIMARY KEY ASC,
   publicKey BLOB NOT NULL,
-  publicKeyAlgorithm_id INT NOT NULL,
+  publicKeyAlgorithm_id INTEGER NOT NULL,
   version SMALLINT NOT NULL,
   serialNumber VARCHAR(128) NOT NULL,
   subject VARCHAR(1024) NOT NULL,
@@ -93,28 +80,22 @@ CREATE TABLE IF NOT EXISTS Certificate (
   notBefore TIMESTAMP NOT NULL,
   notAfter TIMESTAMP NOT NULL,
   signature BLOB NOT NULL,
-  signatureAlgorithm_id INT NOT NULL,
+  signatureAlgorithm_id INTEGER NOT NULL,
   isCa TINYINT(1) NOT NULL,    -- boolean: 0=false, 1=true
   rawContent BLOB NOT NULL,
   sha256Fingerprint VARCHAR(64) NOT NULL,
   sha256PublicKey VARCHAR(64) NOT NULL,
-  privateKey_id INT NULL,
-  PRIMARY KEY (id ASC),
-  INDEX (publicKeyAlgorithm_id ASC),
-  INDEX (signatureAlgorithm_id ASC),
-  INDEX (privateKey_id ASC),
-  INDEX (sha256Fingerprint ASC),
-  INDEX (sha256PublicKey ASC),
-  CONSTRAINT fk_Certificate_PublicKeyAlgorithm
-    FOREIGN KEY (publicKeyAlgorithm_id)
-    REFERENCES PublicKeyAlgorithm (id),
-  CONSTRAINT fk_Certificate_SignatureAlgorithm
-    FOREIGN KEY (signatureAlgorithm_id)
-    REFERENCES SignatureAlgorithm (id),
-  CONSTRAINT fk_Certificate_PrivateKey
-    FOREIGN KEY (privateKey_id)
-    REFERENCES PrivateKey (id)
+  privateKey_id INTEGER,
+  CONSTRAINT fk_Certificate_PublicKeyAlgorithm FOREIGN KEY (publicKeyAlgorithm_id) REFERENCES PublicKeyAlgorithm (id),
+  CONSTRAINT fk_Certificate_SignatureAlgorithm FOREIGN KEY (signatureAlgorithm_id) REFERENCES SignatureAlgorithm (id),
+  CONSTRAINT fk_Certificate_PrivateKey FOREIGN KEY (privateKey_id) REFERENCES PrivateKey (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_Certificate_PublicKeyAlgorithm ON Certificate(publicKeyAlgorithm_id ASC);
+CREATE INDEX IF NOT EXISTS idx_Certificate_SignatureAlgorithm ON Certificate(signatureAlgorithm_id ASC);
+CREATE INDEX IF NOT EXISTS idx_Certificate_PrivateKey ON Certificate(privateKey_id ASC);
+CREATE INDEX IF NOT EXISTS idx_Certificate_SHA256Fingerprint ON Certificate(sha256Fingerprint ASC);
+CREATE INDEX IF NOT EXISTS idx_Certificate_SHA256PublicKey ON Certificate(sha256PublicKey ASC);
 
 
 -- -----------------------------------------------------
@@ -123,10 +104,9 @@ CREATE TABLE IF NOT EXISTS Certificate (
 DROP TABLE IF EXISTS AttributeType;
 
 CREATE TABLE IF NOT EXISTS AttributeType (
-  oid VARCHAR(128) NOT NULL,
+  oid VARCHAR(128) PRIMARY KEY ASC,
   name VARCHAR(16) NOT NULL,
-  description VARCHAR(64) NOT NULL,
-  PRIMARY KEY (oid ASC)
+  description VARCHAR(64) NOT NULL
 );
 
 
@@ -136,20 +116,17 @@ CREATE TABLE IF NOT EXISTS AttributeType (
 DROP TABLE IF EXISTS CertificateAttribute;
 
 CREATE TABLE IF NOT EXISTS CertificateAttribute (
-  certificate_id INT NOT NULL,
+  certificate_id INTEGER NOT NULL,
   type VARCHAR(8) NOT NULL,    -- Issuer or Subject
   oid VARCHAR(128) NOT NULL,
   value VARCHAR(512),
-  INDEX (certificate_id ASC),
-  INDEX (oid ASC),
-  INDEX (value ASC),
-  CONSTRAINT fk_CertificateAttribute_Certificate
-    FOREIGN KEY (certificate_id)
-    REFERENCES Certificate (id),
-  CONSTRAINT fk_CertificateAttribute_AttributeType
-    FOREIGN KEY (oid)
-    REFERENCES AttributeType (oid)
+  CONSTRAINT fk_CertificateAttribute_Certificate FOREIGN KEY (certificate_id) REFERENCES Certificate (id),
+  CONSTRAINT fk_CertificateAttribute_AttributeType FOREIGN KEY (oid) REFERENCES AttributeType (oid)
 );
+
+CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Certificate ON CertificateAttribute(certificate_id ASC);
+CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Oid ON CertificateAttribute(oid ASC);
+CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Value ON CertificateAttribute(value ASC);
 
 
 -- -----------------------------------------------------
@@ -158,17 +135,14 @@ CREATE TABLE IF NOT EXISTS CertificateAttribute (
 DROP TABLE IF EXISTS CertificateOwner;
 
 CREATE TABLE IF NOT EXISTS CertificateOwner (
-  certificate_id INT NOT NULL,
-  user_id INT NOT NULL,
-  INDEX (certificate_id ASC),
-  INDEX (user_id ASC),
-  CONSTRAINT fk_CertificateOwner_Certificate
-    FOREIGN KEY (certificate_id)
-    REFERENCES Certificate (id),
-  CONSTRAINT fk_CertificateOwner_User
-    FOREIGN KEY (user_id)
-    REFERENCES User (id)
+  certificate_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  CONSTRAINT fk_CertificateOwner_Certificate FOREIGN KEY (certificate_id) REFERENCES Certificate (id),
+  CONSTRAINT fk_CertificateOwner_User FOREIGN KEY (user_id) REFERENCES User (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_CertificateOwner_Certificate ON CertificateOwner(certificate_id ASC);
+CREATE INDEX IF NOT EXISTS idx_CertificateOwner_User ON CertificateOwner(user_id ASC);
 
 
 -- -----------------------------------------------------
@@ -177,9 +151,8 @@ CREATE TABLE IF NOT EXISTS CertificateOwner (
 DROP TABLE IF EXISTS KeyUsage;
 
 CREATE TABLE IF NOT EXISTS KeyUsage (
-  id INT NOT NULL,
-  name VARCHAR(64) NOT NULL,
-  PRIMARY KEY (id ASC)
+  id INTEGER PRIMARY KEY ASC,
+  name VARCHAR(64) NOT NULL
 );
 
 
@@ -189,18 +162,14 @@ CREATE TABLE IF NOT EXISTS KeyUsage (
 DROP TABLE IF EXISTS CertificateKeyUsage;
 
 CREATE TABLE IF NOT EXISTS CertificateKeyUsage (
-  certificate_id INT NOT NULL,
-  keyUsage_id INT NOT NULL,
-  INDEX (keyUsage_id ASC),
-  INDEX (certificate_id ASC),
-  CONSTRAINT fk_CertificateKeyUsage_Certificate
-    FOREIGN KEY (certificate_id)
-    REFERENCES Certificate (id),
-  CONSTRAINT fk_CertificateKeyUsage_KeyUsage
-    FOREIGN KEY (keyUsage_id)
-    REFERENCES KeyUsage (id)
+  certificate_id INTEGER NOT NULL,
+  keyUsage_id INTEGER NOT NULL,
+  CONSTRAINT fk_CertificateKeyUsage_Certificate FOREIGN KEY (certificate_id) REFERENCES Certificate (id),
+  CONSTRAINT fk_CertificateKeyUsage_KeyUsage FOREIGN KEY (keyUsage_id) REFERENCES KeyUsage (id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_CertificateKeyUsage_KeyUsage ON CertificateKeyUsage(keyUsage_id ASC);
+CREATE INDEX IF NOT EXISTS idx_CertificateKeyUsage_Certificate ON CertificateKeyUsage(certificate_id ASC);
 
 -- -----------------------------------------------------
 -- Table SubjectAlternateNameType
@@ -208,9 +177,8 @@ CREATE TABLE IF NOT EXISTS CertificateKeyUsage (
 DROP TABLE IF EXISTS SubjectAlternateNameType;
 
 CREATE TABLE IF NOT EXISTS SubjectAlternateNameType (
-  id INT NOT NULL,
-  name VARCHAR(16) NOT NULL,
-  PRIMARY KEY (id ASC)
+  id INTEGER PRIMARY KEY ASC,
+  name VARCHAR(16) NOT NULL
 );
 
 
@@ -220,15 +188,13 @@ CREATE TABLE IF NOT EXISTS SubjectAlternateNameType (
 DROP TABLE IF EXISTS SubjectAlternateName;
 
 CREATE TABLE IF NOT EXISTS SubjectAlternateName (
-  id INT NOT NULL AUTO_INCREMENT,
+  id INTEGER PRIMARY KEY ASC,
   name VARCHAR(256) NOT NULL,
-  subjectAlternateNameType_id INT NOT NULL,
-  PRIMARY KEY (id ASC),
-  INDEX (subjectAlternateNameType_id ASC),
-  CONSTRAINT fk_SubjectAlternateName_SubjectAlternateNameType
-    FOREIGN KEY (subjectAlternateNameType_id)
-    REFERENCES SubjectAlternateNameType (id)
+  subjectAlternateNameType_id INTEGER NOT NULL,
+  CONSTRAINT fk_SubjectAlternateName_SubjectAlternateNameType FOREIGN KEY (subjectAlternateNameType_id) REFERENCES SubjectAlternateNameType (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_SubjectAlternateName_Type ON SubjectAlternateName(subjectAlternateNameType_id ASC);
 
 
 -- -----------------------------------------------------
@@ -237,17 +203,14 @@ CREATE TABLE IF NOT EXISTS SubjectAlternateName (
 DROP TABLE IF EXISTS CertificateSAN;
 
 CREATE TABLE IF NOT EXISTS CertificateSAN (
-  certificate_id INT NOT NULL,
-  subjectAlternateName_id INT NOT NULL,
-  INDEX (subjectAlternateName_id ASC),
-  INDEX (certificate_id ASC),
-  CONSTRAINT fk_CertificateSAN_Certificate
-    FOREIGN KEY (certificate_id)
-    REFERENCES Certificate (id),
-  CONSTRAINT fk_CertificateSAN_SubjectAlternateName
-    FOREIGN KEY (subjectAlternateName_id)
-    REFERENCES SubjectAlternateName (id)
+  certificate_id INTEGER NOT NULL,
+  subjectAlternateName_id INTEGER NOT NULL,
+  CONSTRAINT fk_CertificateSAN_Certificate FOREIGN KEY (certificate_id) REFERENCES Certificate (id),
+  CONSTRAINT fk_CertificateSAN_SubjectAlternateName FOREIGN KEY (subjectAlternateName_id) REFERENCES SubjectAlternateName (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_CertificateSAN_SubjectAlternateName ON CertificateSAN(subjectAlternateName_id ASC);
+CREATE INDEX IF NOT EXISTS idx_CertificateSAN_Certificate ON CertificateSAN(certificate_id ASC);
 
 
 -- -----------------------------------------------------
@@ -311,15 +274,15 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO SubjectAlternateNameType (id, name)
 VALUES
-    (1, 'Other'),
-    (2, 'EmailAddress'),
-    (3, 'DNSName'),
-    (4, 'X400Address'),
-    (5, 'DirectoryName'),
-    (6, 'EDIPartyName'),
-    (7, 'URI'),
-    (8, 'IPAddress'),
-    (9, 'RegisteredID')
+  (1, 'Other'),
+  (2, 'EmailAddress'),
+  (3, 'DNSName'),
+  (4, 'X400Address'),
+  (5, 'DirectoryName'),
+  (6, 'EDIPartyName'),
+  (7, 'URI'),
+  (8, 'IPAddress'),
+  (9, 'RegisteredID')
 ;
 
 
@@ -328,11 +291,11 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO PrivateKeyType (id, type)
 VALUES
-    (0, 'Unknown'),
-    (1, 'RSA'),
-    (2, 'ECDSA'),
-    (3, 'Ed25519'),
-    (4, 'ECDH')
+  (0, 'Unknown'),
+  (1, 'RSA'),
+  (2, 'ECDSA'),
+  (3, 'Ed25519'),
+  (4, 'ECDH')
 ;
 
 
@@ -341,13 +304,13 @@ VALUES
 -- -----------------------------------------------------
 INSERT INTO AttributeType (oid, name, description)
 VALUES
-    ('2.5.4.3', 'CN', 'Common Name'),
-    ('2.5.4.5', 'SERIALNUMBER', 'Serial Number'),
-    ('2.5.4.6', 'C', 'Country Name'),
-    ('2.5.4.7', 'L', 'Locality Name'),
-    ('2.5.4.8', 'ST', 'State or Province Name'),
-    ('2.5.4.9', 'STREET', 'Street Address'),
-    ('2.5.4.10', 'O', 'Organization Name'),
-    ('2.5.4.11', 'OU', 'Organization Unit Name'),
-    ('2.5.4.17', 'POSTALCODE', 'Postal Code')
+  ('2.5.4.3', 'CN', 'Common Name'),
+  ('2.5.4.5', 'SERIALNUMBER', 'Serial Number'),
+  ('2.5.4.6', 'C', 'Country Name'),
+  ('2.5.4.7', 'L', 'Locality Name'),
+  ('2.5.4.8', 'ST', 'State or Province Name'),
+  ('2.5.4.9', 'STREET', 'Street Address'),
+  ('2.5.4.10', 'O', 'Organization Name'),
+  ('2.5.4.11', 'OU', 'Organization Unit Name'),
+  ('2.5.4.17', 'POSTALCODE', 'Postal Code')
 ;
