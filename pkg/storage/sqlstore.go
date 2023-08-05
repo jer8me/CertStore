@@ -18,10 +18,11 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	var publicKeyAlgorithmId int
 	var signatureAlgorithmId int
 	// Fetch Certificate object
-	err := db.QueryRow("SELECT publicKey, publicKeyAlgorithm_id, version, serialNumber, subject, issuer, notBefore, "+
-		"notAfter, signature, signatureAlgorithm_id, isCa, rawContent FROM Certificate WHERE id = ?", certificateId).
-		Scan(&cert.PublicKey, &publicKeyAlgorithmId, &cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN,
-			&cert.NotBefore, &cert.NotAfter, &cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent)
+	err := db.QueryRow("SELECT publicKey, publicKeyAlgorithm_id, version, serialNumber, subject, "+
+		"issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent, privateKey_id "+
+		"FROM Certificate WHERE id = ?", certificateId).Scan(&cert.PublicKey, &publicKeyAlgorithmId,
+		&cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter,
+		&cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent, &cert.PrivateKeyId)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("invalid certificate ID: %d", certificateId)
 	}
@@ -436,6 +437,23 @@ func GetPrivateKey(db *sql.DB, privateKeyId int64) (*PrivateKey, error) {
 		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
 	}
 	return privateKey, nil
+}
+
+func GetCertificatePrivateKeyId(db *sql.DB, certificateId int64) (int64, error) {
+	var privateKeyId sql.NullInt64
+	// Fetch Certificate object
+	err := db.QueryRow("SELECT privateKey_id FROM Certificate WHERE id = ?", certificateId).Scan(&privateKeyId)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("invalid certificate ID: %d", certificateId)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
+	}
+	if !privateKeyId.Valid {
+		// Certificate does not have a private key
+		return 0, errors.New("certificate does not have a private key")
+	}
+	return privateKeyId.Int64, nil
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string
