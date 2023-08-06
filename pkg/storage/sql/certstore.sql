@@ -1,15 +1,4 @@
 -- -----------------------------------------------------
--- Table User
--- -----------------------------------------------------
-DROP TABLE IF EXISTS User;
-
-CREATE TABLE IF NOT EXISTS User (
-  id INTEGER PRIMARY KEY ASC,
-  name VARCHAR(64) NOT NULL
-);
-
-
--- -----------------------------------------------------
 -- Table PublicKeyAlgorithm
 -- -----------------------------------------------------
 DROP TABLE IF EXISTS PublicKeyAlgorithm;
@@ -127,22 +116,6 @@ CREATE TABLE IF NOT EXISTS CertificateAttribute (
 CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Certificate ON CertificateAttribute(certificate_id ASC);
 CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Oid ON CertificateAttribute(oid ASC);
 CREATE INDEX IF NOT EXISTS idx_CertificateAttribute_Value ON CertificateAttribute(value ASC);
-
-
--- -----------------------------------------------------
--- Table CertificateOwner
--- -----------------------------------------------------
-DROP TABLE IF EXISTS CertificateOwner;
-
-CREATE TABLE IF NOT EXISTS CertificateOwner (
-  certificate_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
-  CONSTRAINT fk_CertificateOwner_Certificate FOREIGN KEY (certificate_id) REFERENCES Certificate (id),
-  CONSTRAINT fk_CertificateOwner_User FOREIGN KEY (user_id) REFERENCES User (id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_CertificateOwner_Certificate ON CertificateOwner(certificate_id ASC);
-CREATE INDEX IF NOT EXISTS idx_CertificateOwner_User ON CertificateOwner(user_id ASC);
 
 
 -- -----------------------------------------------------
