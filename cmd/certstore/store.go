@@ -33,8 +33,7 @@ func parseFiles(cmd *cobra.Command, args []string) error {
 		privateKeys = append(privateKeys, pk...)
 	}
 	// If we found one or more private keys, we need a password parameter
-	pwd, err := cmd.Flags().GetString(pwdFlag)
-	if (pwd == "") || (err != nil) {
+	if password == "" {
 		return fmt.Errorf("a password must be provided when storing private keys")
 	}
 	return nil
@@ -60,13 +59,9 @@ func storeCertificate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	pwd, err := cmd.Flags().GetString(pwdFlag)
-	if err != nil {
-		return err
-	}
 	// Store private keys in database
 	for _, privateKey := range privateKeys {
-		encryptedPrivateKey, err := storage.EncryptPrivateKey(privateKey, pwd)
+		encryptedPrivateKey, err := storage.EncryptPrivateKey(privateKey, password)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
 			continue
@@ -82,6 +77,6 @@ func storeCertificate(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	storeCmd.Flags().StringP(pwdFlag, "p", "", "Private key encryption password")
+	storeCmd.Flags().StringVarP(&password, passwordFlag, "p", "", "Private Key Password")
 	rootCmd.AddCommand(storeCmd)
 }

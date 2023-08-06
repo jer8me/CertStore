@@ -9,27 +9,35 @@ import (
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"os"
+	"strconv"
 )
 
 var (
 	// Command
 	saveCmd = &cobra.Command{
-		Use:     "save output_file",
+		Use:     "save certificate_id",
 		Args:    cobra.ExactArgs(1),
-		Short:   "Save a certificate to a file",
-		PreRunE: checkFlags,
+		Short:   "Save a certificate and/or a private key to a file",
+		PreRunE: checkSaveFlags,
 		RunE:    save,
 	}
 )
 
-func checkFlags(cmd *cobra.Command, args []string) error {
-	if cmd.Flags().Lookup(privFlag).Changed {
-		privKeyFile, err := cmd.Flags().GetString(privFlag)
-		if (privKeyFile == "") || (err != nil) {
-			return fmt.Errorf("invalid private key file name")
+func checkSaveFlags(cmd *cobra.Command, args []string) error {
+	var err error
+	if certificateId, err = strconv.ParseInt(args[0], 10, 64); err != nil {
+		return fmt.Errorf("invalid certificate ID")
+	}
+	if cmd.Flags().Lookup(certFileFlag).Changed {
+		if certificateFile == "" {
+			return fmt.Errorf("certificate file name cannot be empty")
 		}
-		pwd, err := cmd.Flags().GetString(pwdFlag)
-		if (pwd == "") || (err != nil) {
+	}
+	if cmd.Flags().Lookup(privKeyFileFlag).Changed {
+		if privateKeyFile == "" {
+			return fmt.Errorf("private key file name cannot be empty")
+		}
+		if password == "" {
 			return fmt.Errorf("password cannot be empty")
 		}
 	}
@@ -46,34 +54,30 @@ func save(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = saveCertificate(db, certificateId, args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
-		os.Exit(1)
+	if certificateFile != "" {
+		err = saveCertificate(db, certificateId, certificateFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("certificate successfully saved to file %s\n", certificateFile)
 	}
-	fmt.Printf("certificate %s successfully saved\n", args[0])
 
-	// Retrieve certificate data from database
-	privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-		os.Exit(1)
-	}
-	privateKeyFile, err := cmd.Flags().GetString(privFlag)
-	if err != nil {
-		return err
-	}
-	pwd, err := cmd.Flags().GetString(pwdFlag)
-	if err != nil {
-		return err
-	}
-	// Save private key to file
-	err = savePrivateKey(db, privateKeyId, privateKeyFile, pwd)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-		os.Exit(1)
-	} else {
-		fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)
+	if privateKeyFile != "" {
+		// Retrieve certificate data from database
+		privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+			os.Exit(1)
+		}
+		// Save private key to file
+		err = savePrivateKey(db, privateKeyId, privateKeyFile, password)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)
+		}
 	}
 	return nil
 }
@@ -100,7 +104,7 @@ func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) e
 	}
 	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password)
 	if errors.Is(err, common.AuthError) {
-		return errors.New("failed to decrypt private key: invalid password")
+		return errors.New("invalid password")
 	} else if err != nil {
 		return fmt.Errorf("failed to decrypt private key: %w", err)
 	}
@@ -113,9 +117,9 @@ func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) e
 }
 
 func init() {
-	addIdFlag(saveCmd, false)
-	saveCmd.Flags().StringP(privFlag, "k", "", "Private Key File Name")
-	saveCmd.Flags().StringP(pwdFlag, "p", "", "Private Key encryption password")
-	saveCmd.MarkFlagsRequiredTogether(privFlag, pwdFlag)
+	saveCmd.Flags().StringVarP(&certificateFile, certFileFlag, "c", "", "Certificate Output File")
+	saveCmd.Flags().StringVarP(&privateKeyFile, privKeyFileFlag, "k", "", "Private Key Output File")
+	saveCmd.Flags().StringVarP(&password, passwordFlag, "p", "", "Private Key Password")
+	saveCmd.MarkFlagsRequiredTogether(privKeyFileFlag, passwordFlag)
 	rootCmd.AddCommand(saveCmd)
 }

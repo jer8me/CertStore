@@ -6,16 +6,26 @@ import (
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"os"
+	"strconv"
 )
 
 var (
 	// Command
 	showCmd = &cobra.Command{
-		Use:   "show",
-		Short: "Show a certificate",
-		RunE:  showCertificate,
+		Use:     "show certificate_id",
+		Short:   "Show a certificate",
+		PreRunE: checkShowFlags,
+		RunE:    showCertificate,
 	}
 )
+
+func checkShowFlags(cmd *cobra.Command, args []string) error {
+	var err error
+	if certificateId, err = strconv.ParseInt(args[0], 10, 64); err != nil {
+		return fmt.Errorf("invalid certificate ID")
+	}
+	return nil
+}
 
 func showCertificate(cmd *cobra.Command, args []string) error {
 	db, err := openSQLite()
@@ -39,6 +49,5 @@ func showCertificate(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	addIdFlag(showCmd, true)
 	rootCmd.AddCommand(showCmd)
 }
