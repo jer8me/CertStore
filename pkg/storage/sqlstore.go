@@ -115,7 +115,7 @@ func GetCertificates(db *sql.DB, searchFilters *SearchFilter) ([]*Certificate, e
 	return certificates, nil
 }
 
-func SearchQuery(db *sql.DB, searchFilters *SearchFilter) (string, []any) {
+func SearchQuery(searchFilters *SearchFilter) (string, []any) {
 	qb := NewQueryBuilder()
 	qb.WriteString("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, c.notAfter, c.isCa, c.privateKey_id ")
 	qb.WriteString("FROM Certificate c INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id ")
