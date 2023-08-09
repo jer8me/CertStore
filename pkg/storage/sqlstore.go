@@ -86,7 +86,7 @@ func GetX509Certificate(db *sql.DB, certificateId int64) (*x509.Certificate, err
 }
 
 func GetCertificates(db *sql.DB, searchFilters *SearchFilter) ([]*Certificate, error) {
-	query, args := SearchQuery(db, searchFilters)
+	query, args := SearchQuery(searchFilters)
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
