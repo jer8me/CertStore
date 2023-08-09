@@ -85,10 +85,9 @@ func GetX509Certificate(db *sql.DB, certificateId int64) (*x509.Certificate, err
 	return x509Certificate, nil
 }
 
-func GetCertificates(db *sql.DB) ([]*Certificate, error) {
-	rows, err := db.Query("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, " +
-		"c.notAfter, c.isCa, c.privateKey_id FROM Certificate c " +
-		"INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id")
+func GetCertificates(db *sql.DB, searchFilters *SearchFilter) ([]*Certificate, error) {
+	query, args := SearchQuery(db, searchFilters)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +113,33 @@ func GetCertificates(db *sql.DB) ([]*Certificate, error) {
 		return certificates, err
 	}
 	return certificates, nil
+}
+
+func SearchQuery(db *sql.DB, searchFilters *SearchFilter) (string, []any) {
+	qb := NewQueryBuilder()
+	qb.WriteString("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, c.notAfter, c.isCa, c.privateKey_id ")
+	qb.WriteString("FROM Certificate c INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id ")
+	// Setup potential filtering
+	qb.WriteString("WHERE c.id IN(")
+	qb.FilterLike("SELECT DISTINCT cs.certificate_id FROM SubjectAlternateName sa JOIN CertificateSAN cs ON sa.id = cs.subjectAlternateName_id WHERE sa.name", searchFilters.San)
+	qb.FilterLike("SELECT DISTINCT id FROM Certificate WHERE serialNumber", searchFilters.Serial)
+	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND value", searchFilters.Issuer)
+	if searchFilters.Issuer == "" {
+		// If the global Issuer search is not used, look into each Issuer field
+
+	}
+	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND value", searchFilters.Subject)
+	if searchFilters.Subject == "" {
+		// If the global Subject search is not used, look into each Subject field
+
+	}
+	if !qb.HasFilter {
+		// No filtering: include all certificate IDs
+		qb.WriteString("c.id")
+	}
+	qb.WriteString(")")
+
+	return qb.String(), qb.Args
 }
 
 func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, error) {
