@@ -126,13 +126,42 @@ func SearchQuery(searchFilters *SearchFilter) (string, []any) {
 	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND value", searchFilters.Issuer)
 	if searchFilters.Issuer == "" {
 		// If the global Issuer search is not used, look into each Issuer field
-
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.3' AND value", searchFilters.IssuerCn)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.6' AND value", searchFilters.IssuerCountry)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.7' AND value", searchFilters.IssuerLocality)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.8' AND value", searchFilters.IssuerState)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.9' AND value", searchFilters.IssuerStreet)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.10' AND value", searchFilters.IssuerOrg)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.11' AND value", searchFilters.IssuerOrgUnit)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.17' AND value", searchFilters.IssuerPostalCode)
 	}
 	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND value", searchFilters.Subject)
 	if searchFilters.Subject == "" {
 		// If the global Subject search is not used, look into each Subject field
-
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.3' AND value", searchFilters.SubjectCn)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.6' AND value", searchFilters.SubjectCountry)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.7' AND value", searchFilters.SubjectLocality)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.8' AND value", searchFilters.SubjectState)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.9' AND value", searchFilters.SubjectStreet)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.10' AND value", searchFilters.SubjectOrg)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.11' AND value", searchFilters.SubjectOrgUnit)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.17' AND value", searchFilters.SubjectPostalCode)
 	}
+	isCA := -1
+	if searchFilters.IsCA {
+		isCA = 1
+	} else if searchFilters.NotCA {
+		isCA = 0
+	}
+	if isCA >= 0 {
+		qb.FilterEqual("SELECT DISTINCT id FROM Certificate WHERE isCa", isCA)
+	}
+	if searchFilters.HasPrivateKey {
+		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id NOT NULL")
+	} else if searchFilters.NoPrivateKey {
+		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id IS NULL")
+	}
+
 	if !qb.HasFilter {
 		// No filtering: include all certificate IDs
 		qb.WriteString("c.id")

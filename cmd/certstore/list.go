@@ -59,6 +59,12 @@ func init() {
 	listCmd.Flags().StringVar(&searchFilters.SubjectOrg, "subject-org", "", "Certificate Subject Organization")
 	listCmd.Flags().StringVar(&searchFilters.SubjectOrgUnit, "subject-org-unit", "", "Certificate Subject Organization Unit")
 	listCmd.Flags().StringVar(&searchFilters.SubjectPostalCode, "subject-postal-code", "", "Certificate Subject Postal Code")
+	listCmd.Flags().BoolVar(&searchFilters.IsCA, "is-ca", false, "Certificate is a CA")
+	listCmd.Flags().BoolVar(&searchFilters.NotCA, "not-ca", false, "Certificate is not a CA")
+	listCmd.Flags().BoolVar(&searchFilters.HasPrivateKey, "has-private-key", false, "Certificate has a Private Key")
+	listCmd.Flags().BoolVar(&searchFilters.NoPrivateKey, "no-private-key", false, "Certificate does not have a Private Key")
 
+	listCmd.MarkFlagsMutuallyExclusive("is-ca", "not-ca")
+	listCmd.MarkFlagsMutuallyExclusive("has-private-key", "no-private-key")
 	rootCmd.AddCommand(listCmd)
 }
