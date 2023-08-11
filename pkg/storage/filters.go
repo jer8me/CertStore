@@ -6,31 +6,31 @@ import (
 )
 
 type SearchFilter struct {
-	San               string
-	Serial            string
-	Issuer            string
-	IssuerCn          string
-	IssuerCountry     string
-	IssuerLocality    string
-	IssuerState       string
-	IssuerStreet      string
-	IssuerOrg         string
-	IssuerOrgUnit     string
-	IssuerPostalCode  string
-	Subject           string
-	SubjectCn         string
-	SubjectCountry    string
-	SubjectLocality   string
-	SubjectState      string
-	SubjectStreet     string
-	SubjectOrg        string
-	SubjectOrgUnit    string
-	SubjectPostalCode string
-	PublicKeyType     string
-	IsCA              bool
-	NotCA             bool
-	HasPrivateKey     bool
-	NoPrivateKey      bool
+	San                 string
+	Serial              string
+	Issuer              string
+	IssuerCn            string
+	IssuerCountry       string
+	IssuerLocality      string
+	IssuerState         string
+	IssuerStreet        string
+	IssuerOrg           string
+	IssuerOrgUnit       string
+	IssuerPostalCode    string
+	Subject             string
+	SubjectCn           string
+	SubjectCountry      string
+	SubjectLocality     string
+	SubjectState        string
+	SubjectStreet       string
+	SubjectOrg          string
+	SubjectOrgUnit      string
+	SubjectPostalCode   string
+	PublicKeyAlgorithms []string
+	IsCA                bool
+	NotCA               bool
+	HasPrivateKey       bool
+	NoPrivateKey        bool
 }
 
 type QueryBuilder struct {
@@ -49,7 +49,11 @@ func (qb *QueryBuilder) AddArg(arg any) {
 	qb.Args = append(qb.Args, arg)
 }
 
-func (qb *QueryBuilder) Filter(query string) {
+func (qb *QueryBuilder) AddArgs(args []any) {
+	qb.Args = append(qb.Args, args...)
+}
+
+func (qb *QueryBuilder) Filter(query string, more ...string) {
 	if qb.HasFilter {
 		// Filters are additive: use intersection to add another filter
 		qb.WriteString(" INTERSECT ")
@@ -57,6 +61,9 @@ func (qb *QueryBuilder) Filter(query string) {
 		qb.HasFilter = true
 	}
 	qb.WriteString(query)
+	for _, s := range more {
+		qb.WriteString(s)
+	}
 }
 
 func (qb *QueryBuilder) FilterLike(query, value string) {
@@ -64,8 +71,7 @@ func (qb *QueryBuilder) FilterLike(query, value string) {
 		// No value to filter on
 		return
 	}
-	qb.Filter(query)
-	qb.WriteString(" LIKE ?")
+	qb.Filter(query, " LIKE ?")
 	// Build argument string
 	var arg strings.Builder
 	arg.WriteByte('%')
@@ -86,9 +92,19 @@ func (qb *QueryBuilder) FilterEqual(query string, value any) {
 		// No value to filter on
 		return
 	}
-	qb.Filter(query)
-	qb.WriteString(" = ?")
+	qb.Filter(query, " = ?")
 	qb.AddArg(value)
+}
+
+func (qb *QueryBuilder) FilterIn(query string, values []any) {
+	if len(values) == 0 {
+		// No values to filter on
+		return
+	}
+	placeholders := strings.Repeat("?,", len(values))
+	placeholders = strings.TrimSuffix(placeholders, ",")
+	qb.Filter(query, " IN (", placeholders, ")")
+	qb.AddArgs(values)
 }
 
 func (qb *QueryBuilder) String() string {

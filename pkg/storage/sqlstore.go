@@ -147,19 +147,34 @@ func SearchQuery(searchFilters *SearchFilter) (string, []any) {
 		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.11' AND value", searchFilters.SubjectOrgUnit)
 		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.17' AND value", searchFilters.SubjectPostalCode)
 	}
+	// Public Key Algorithms
+	if len(searchFilters.PublicKeyAlgorithms) > 0 {
+		// Convert all string values to upper case because the IN operator is case-insensitive
+		var pkas []any
+		for _, pka := range searchFilters.PublicKeyAlgorithms {
+			pkas = append(pkas, strings.ToUpper(pka))
+		}
+		qb.FilterIn("SELECT DISTINCT cert.id FROM Certificate cert JOIN PublicKeyAlgorithm pka ON cert.publicKeyAlgorithm_id = pka.id WHERE UPPER(pka.name)", pkas)
+	}
+	// Is CA
 	isCA := -1
 	if searchFilters.IsCA {
 		isCA = 1
 	} else if searchFilters.NotCA {
 		isCA = 0
 	}
-	if isCA >= 0 {
+	if (isCA == 0) || (isCA == 1) {
 		qb.FilterEqual("SELECT DISTINCT id FROM Certificate WHERE isCa", isCA)
 	}
+	// Has Private Key
+	var condition string
 	if searchFilters.HasPrivateKey {
-		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id NOT NULL")
+		condition = "NOT NULL"
 	} else if searchFilters.NoPrivateKey {
-		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id IS NULL")
+		condition = "IS NULL"
+	}
+	if condition != "" {
+		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id ", condition)
 	}
 
 	if !qb.HasFilter {
