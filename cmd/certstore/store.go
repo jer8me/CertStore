@@ -11,9 +11,9 @@ import (
 )
 
 var storeCmd = &cobra.Command{
-	Use:     "store cert_path [...cert_path]",
+	Use:     "store pem_file [...pem_file]",
 	Args:    cobra.MinimumNArgs(1),
-	Short:   "Store a certificate",
+	Short:   "Store a certificate and/or a private key",
 	PreRunE: parseFiles,
 	RunE:    storeCertificate,
 }
