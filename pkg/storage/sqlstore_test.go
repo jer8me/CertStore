@@ -33,6 +33,19 @@ func closeDB(t *testing.T, db *sql.DB) {
 	require.NoError(t, err, "failed to close database")
 }
 
+func loadCertificate(t *testing.T, db *sql.DB, filename string) int64 {
+	// Read certificate file
+	certs, privateKeys, err := certificates.ParsePEMFile(certPath(filename))
+	require.NoError(t, err, "failed to read certificate file")
+	require.Nil(t, privateKeys, "unexpected private keys found")
+	require.Len(t, certs, 1, "expected exactly one certificate")
+
+	// Store certificate in database
+	certificateId, err := storage.StoreCertificate(db, storage.ToCertificate(certs[0]), false)
+	require.NoError(t, err, "failed to store certificate")
+	return certificateId
+}
+
 func TestGetCertificate(t *testing.T) {
 
 	// Connect to database
@@ -40,21 +53,30 @@ func TestGetCertificate(t *testing.T) {
 	defer closeDB(t, db)
 	initDB(t, db)
 
-	// Read certificate file
-	certs, privateKeys, err := certificates.ParsePEMFile(certPath("champlain.crt"))
-	require.NoError(t, err, "failed to read certificate file")
-	assert.Nil(t, privateKeys, "unexpected private keys found")
-	assert.Len(t, certs, 1, "expected exactly one certificate")
-
-	// Store certificate in database
-	certificateId, err := storage.StoreCertificate(db, storage.ToCertificate(certs[0]), false)
-	require.NoError(t, err, "failed to store certificate")
-
+	certificateId := loadCertificate(t, db, "champlain.crt")
 	cert, err := storage.GetCertificate(db, certificateId)
 	if err != nil {
 		require.NoError(t, err, "failed to get certificate")
 	}
 	assert.NotNil(t, cert.Signature)
+}
+
+func TestGetCertificates(t *testing.T) {
+
+	// Connect to database
+	db := openDB(t)
+	defer closeDB(t, db)
+	initDB(t, db)
+
+	certificateId := loadCertificate(t, db, "selfsigned.crt")
+	// Test special characters in subject search
+	searchFilter := &storage.SearchFilter{Subject: `/%__%\`}
+	got, err := storage.GetCertificates(db, searchFilter)
+	if err != nil {
+		require.NoError(t, err, "failed to get certificates")
+	}
+	require.Len(t, got, 1, "expected exactly one certificate")
+	assert.Equal(t, certificateId, got[0].Id, "certificate ID does not match")
 }
 
 func TestStoreCertificate(t *testing.T) {
