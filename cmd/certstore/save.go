@@ -44,7 +44,7 @@ func checkSaveFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func save(cmd *cobra.Command, args []string) error {
+func save(_ *cobra.Command, _ []string) error {
 	db, err := openSQLite()
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func save(cmd *cobra.Command, args []string) error {
 	if certificateFile != "" {
 		err = saveCertificate(db, certificateId, certificateFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
 			os.Exit(1)
 		}
 		fmt.Printf("certificate successfully saved to file %s\n", certificateFile)
@@ -67,13 +67,13 @@ func save(cmd *cobra.Command, args []string) error {
 		// Retrieve certificate data from database
 		privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
 			os.Exit(1)
 		}
 		// Save private key to file
 		err = savePrivateKey(db, privateKeyId, privateKeyFile, password)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
 			os.Exit(1)
 		} else {
 			fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)

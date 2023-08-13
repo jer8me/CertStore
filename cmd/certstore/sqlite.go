@@ -20,6 +20,6 @@ func initSQLite(db *sql.DB) error {
 
 func closeSQLite(db *sql.DB) {
 	if err := db.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to closed database: %s\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "failed to closed database: %s\n", err)
 	}
 }

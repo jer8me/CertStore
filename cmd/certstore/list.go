@@ -55,7 +55,7 @@ func listCertificates(_ *cobra.Command, _ []string) error {
 	// Fetch certificate
 	certs, err := storage.GetCertificates(db, &searchFilters)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to retrieve certificates from database: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificates from database: %v\n", err)
 		os.Exit(1)
 	}
 	certificates.PrintCertificates(os.Stdout, certs)

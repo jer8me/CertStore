@@ -19,7 +19,7 @@ var (
 	}
 )
 
-func checkShowFlags(cmd *cobra.Command, args []string) error {
+func checkShowFlags(_ *cobra.Command, args []string) error {
 	var err error
 	if certificateId, err = strconv.ParseInt(args[0], 10, 64); err != nil {
 		return fmt.Errorf("invalid certificate ID")
@@ -27,7 +27,7 @@ func checkShowFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showCertificate(cmd *cobra.Command, args []string) error {
+func showCertificate(_ *cobra.Command, _ []string) error {
 	db, err := openSQLite()
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func showCertificate(cmd *cobra.Command, args []string) error {
 	// Fetch certificate
 	cert, err := storage.GetCertificate(db, certificateId)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
 		os.Exit(1)
 	}
 	certificates.PrintCertificate(os.Stdout, cert)

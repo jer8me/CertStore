@@ -26,7 +26,7 @@ func parseFiles(_ *cobra.Command, args []string) error {
 		// Read PEM file
 		c, pk, err := certificates.ParsePEMFile(filepath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read file %s: %v\n", filepath, err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to read file %s: %v\n", filepath, err)
 			continue
 		}
 		certs = append(certs, c...)
@@ -53,9 +53,9 @@ func storeCertificate(_ *cobra.Command, _ []string) error {
 	for _, cert := range certs {
 		certificateId, err := storage.StoreX509Certificate(db, cert)
 		if err == nil {
-			fmt.Printf("Certificate %v successfully stored (certificate ID=%d)\n", cert.Subject, certificateId)
+			_, _ = fmt.Printf("Certificate %v successfully stored (certificate ID=%d)\n", cert.Subject, certificateId)
 		} else {
-			fmt.Fprintf(os.Stderr, "failed to store certificate %v: %v\n", cert.Subject, err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to store certificate %v: %v\n", cert.Subject, err)
 		}
 	}
 
@@ -63,14 +63,14 @@ func storeCertificate(_ *cobra.Command, _ []string) error {
 	for _, privateKey := range privateKeys {
 		encryptedPrivateKey, err := storage.EncryptPrivateKey(privateKey, password)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
 			continue
 		}
 		privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey, true)
 		if err == nil {
 			fmt.Printf("%s private key successfully stored (private key ID=%d)\n", privateKey.Type(), privateKeyId)
 		} else {
-			fmt.Fprintf(os.Stderr, "failed to store %s private key: %v\n", privateKey.Type(), err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to store %s private key: %v\n", privateKey.Type(), err)
 		}
 	}
 	return nil

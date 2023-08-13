@@ -30,7 +30,7 @@ func ensureHostPort(addr string) (string, error) {
 	return net.JoinHostPort(host, port), nil
 }
 
-func fetchCertificates(cmd *cobra.Command, args []string) error {
+func fetchCertificates(_ *cobra.Command, args []string) error {
 	db, err := openSQLite()
 	if err != nil {
 		return err
@@ -43,13 +43,13 @@ func fetchCertificates(cmd *cobra.Command, args []string) error {
 	for _, address := range args {
 		address, err = ensureHostPort(address)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid address: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "invalid address: %v\n", err)
 			continue
 		}
 		fmt.Printf("Downloading certificates for address: %s\n", address)
 		x509certificates, err := certificates.DownloadCertificates(address)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to download certificates from address %s: %v\n", address, err)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to download certificates from address %s: %v\n", address, err)
 			continue
 		}
 		// Store certificates in database
@@ -58,7 +58,7 @@ func fetchCertificates(cmd *cobra.Command, args []string) error {
 			if err == nil {
 				fmt.Printf("Certificate with subject: %s successfully stored (certificate ID=%d)\n", x509certificate.Subject, certificateId)
 			} else {
-				fmt.Fprintf(os.Stderr, "failed to store certificate with subject: %s: %v\n", x509certificate.Subject, err)
+				_, _ = fmt.Fprintf(os.Stderr, "failed to store certificate with subject: %s: %v\n", x509certificate.Subject, err)
 			}
 		}
 	}
