@@ -21,7 +21,7 @@ var storeCmd = &cobra.Command{
 var certs []*x509.Certificate
 var privateKeys []*common.PrivateKey
 
-func parseFiles(cmd *cobra.Command, args []string) error {
+func parseFiles(_ *cobra.Command, args []string) error {
 	for _, filepath := range args {
 		// Read PEM file
 		c, pk, err := certificates.ParsePEMFile(filepath)
@@ -33,13 +33,13 @@ func parseFiles(cmd *cobra.Command, args []string) error {
 		privateKeys = append(privateKeys, pk...)
 	}
 	// If we found one or more private keys, we need a password parameter
-	if password == "" {
+	if (len(privateKeys) > 0) && (password == "") {
 		return fmt.Errorf("a password must be provided when storing private keys")
 	}
 	return nil
 }
 
-func storeCertificate(cmd *cobra.Command, args []string) error {
+func storeCertificate(_ *cobra.Command, _ []string) error {
 	db, err := openSQLite()
 	if err != nil {
 		return err
