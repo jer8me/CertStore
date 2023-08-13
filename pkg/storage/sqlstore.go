@@ -121,6 +121,9 @@ func SearchQuery(searchFilters *SearchFilter) (string, []any) {
 	qb.WriteString("FROM Certificate c INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id ")
 	// Setup potential filtering
 	qb.WriteString("WHERE c.id IN(")
+	if !searchFilters.ExpireBefore.IsZero() {
+		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE notAfter", "<", searchFilters.ExpireBefore)
+	}
 	qb.FilterLike("SELECT DISTINCT cs.certificate_id FROM SubjectAlternateName sa JOIN CertificateSAN cs ON sa.id = cs.subjectAlternateName_id WHERE sa.name", searchFilters.San)
 	qb.FilterLike("SELECT DISTINCT id FROM Certificate WHERE serialNumber", searchFilters.Serial)
 	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND value", searchFilters.Issuer)
@@ -164,7 +167,7 @@ func SearchQuery(searchFilters *SearchFilter) (string, []any) {
 		isCA = 0
 	}
 	if (isCA == 0) || (isCA == 1) {
-		qb.FilterEqual("SELECT DISTINCT id FROM Certificate WHERE isCa", isCA)
+		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE isCa", "=", isCA)
 	}
 	// Has Private Key
 	var condition string

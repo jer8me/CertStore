@@ -7,6 +7,7 @@ import (
 	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"os"
+	"time"
 )
 
 var listCmd = &cobra.Command{
@@ -18,11 +19,25 @@ var listCmd = &cobra.Command{
 
 var searchFilters storage.SearchFilter
 
+// Cobra does not parse dates directly
+// Use a temporary string variable to store the command line argument
+// The data will be parsed and adjusted in the PreRun function
+var expireBefore string
+
 func checkListFlags(_ *cobra.Command, _ []string) error {
 	for _, algo := range searchFilters.PublicKeyAlgorithms {
 		if !common.ValidPublicKeyAlgorithm(algo) {
 			return fmt.Errorf("%s is not a valid public key algorithm", algo)
 		}
+	}
+	if expireBefore != "" {
+		date, err := time.ParseInLocation(time.DateOnly, expireBefore, time.UTC)
+		if err != nil {
+			return fmt.Errorf("invalid expiration date, must be yyyy-mm-dd")
+		}
+		// Add one day to the value to get our upper bound
+		// The date to find must be strictly less than our upper bound
+		searchFilters.ExpireBefore = date.AddDate(0, 0, 1)
 	}
 	return nil
 }
@@ -50,6 +65,7 @@ func listCertificates(_ *cobra.Command, _ []string) error {
 
 func init() {
 	// Add all filter flags
+	listCmd.Flags().StringVarP(&expireBefore, "expire-before", "e", "", "Certificate Expires On or Before Date (yyyy-mm-dd)")
 	listCmd.Flags().StringVar(&searchFilters.San, "san", "", "Certificate SAN")
 	listCmd.Flags().StringVar(&searchFilters.Serial, "serial", "", "Certificate Serial Number")
 	listCmd.Flags().StringVarP(&searchFilters.Issuer, "issuer", "i", "", "Certificate Issuer Fields")
