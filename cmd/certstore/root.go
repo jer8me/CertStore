@@ -1,7 +1,6 @@
 package certstore
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -16,7 +15,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error while executing CLI: %s", err)
+		// Exit with an error code
 		os.Exit(1)
 	}
 }
