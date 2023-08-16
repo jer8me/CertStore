@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 )
 
+// PrivateKey stores a crypto.PrivateKey along with the original PEM type
 type PrivateKey struct {
 	PEMType string
 	crypto.PrivateKey
@@ -18,15 +19,18 @@ type privKey interface {
 	Equal(x crypto.PrivateKey) bool
 }
 
+// NewPrivateKey creates a new PrivateKey object and returns a PrivateKey pointer.
 func NewPrivateKey(pemType string, privateKey crypto.PrivateKey) *PrivateKey {
 	return &PrivateKey{PEMType: pemType, PrivateKey: privateKey}
 }
 
+// PublicKey returns the public key part of the private key.
 func (pk *PrivateKey) PublicKey() crypto.PublicKey {
 	private := pk.PrivateKey.(privKey)
 	return private.Public()
 }
 
+// Equal returns true if this private key has equivalent values to another private key.
 func (pk *PrivateKey) Equal(other *PrivateKey) bool {
 	private := pk.PrivateKey.(privKey)
 	return private.Equal(other.PrivateKey)
