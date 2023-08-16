@@ -13,6 +13,7 @@ var (
 	// Command
 	showCmd = &cobra.Command{
 		Use:     "show certificate_id",
+		Args:    cobra.ExactArgs(1),
 		Short:   "Show a certificate",
 		PreRunE: checkShowFlags,
 		RunE:    showCertificate,
