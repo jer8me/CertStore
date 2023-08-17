@@ -1,4 +1,4 @@
-package certstore
+package main
 
 import (
 	"database/sql"

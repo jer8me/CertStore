@@ -1,21 +1,22 @@
-package certstore
+package main
 
 import (
+	"database/sql"
 	"github.com/spf13/cobra"
-	"os"
 )
 
-const version = "0.0.1"
-
-var rootCmd = &cobra.Command{
-	Use:     "CertStore",
-	Version: version,
-	Short:   "CertStore - a X.509 certificate management tool",
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		// Exit with an error code
-		os.Exit(1)
+func newRootCommand(db *sql.DB) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "certstore",
+		Version: version,
+		Short:   "CertStore - a X.509 certificate management tool",
 	}
+	cmd.AddCommand(
+		newFetchCommand(db),
+		newListCommand(db),
+		newSaveCommand(db),
+		newShowCommand(db),
+		newStoreCommand(db),
+	)
+	return cmd
 }

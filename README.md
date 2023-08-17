@@ -1,6 +1,6 @@
 # CertStore
 
-A X.509 certificate management tool.
+An X.509 certificate management tool.
 
 ## Prerequisites
 
@@ -22,7 +22,7 @@ The gcc compiler is required to build the SQLite driver.
 ## Build
 
 ```bash
-go build
+go build ./cmd/certstore
 ```
 
 ## Test
@@ -36,7 +36,7 @@ go test ./...
 ### List stored certificates
 
 ```
-CertStore list [flags]
+certstore list [flags]
 ```
 
 #### Options
@@ -76,7 +76,7 @@ CertStore list [flags]
 Specify one or more domain names to fetch certificates from. If no port is specified, the default https port (443) will be used.
 
 ```
-CertStore fetch address [...address] [flags]
+certstore fetch address [...address] [flags]
 ```
 
 #### Options
@@ -88,15 +88,15 @@ CertStore fetch address [...address] [flags]
 #### Examples
 
 ```bash
-CertStore fetch www.champlain.edu
-CertStore fetch champlain.edu google.com
-CertStore fetch champlain.edu:443
+certstore fetch www.champlain.edu
+certstore fetch champlain.edu google.com
+certstore fetch champlain.edu:443
 ```
 
 ### Store a certificate
 
 ```
-CertStore store pem_file [...pem_file] [flags]
+certstore store pem_file [...pem_file] [flags]
 ```
 
 #### Options
@@ -116,7 +116,7 @@ When storing one or more private keys:
 ### Display a certificate
 
 ```
-CertStore show certificate_id [flags]
+certstore show certificate_id [flags]
 ```
 
 #### Options
@@ -130,7 +130,7 @@ CertStore show certificate_id [flags]
 Save a certificate and/or a private key to a file.
 
 ```
-CertStore save certificate_id [flags]
+certstore save certificate_id [flags]
 ```
 
 #### Options

@@ -1,4 +1,4 @@
-package certstore
+package main
 
 import (
 	"database/sql"
@@ -11,76 +11,6 @@ import (
 	"os"
 	"strconv"
 )
-
-var (
-	// Command
-	saveCmd = &cobra.Command{
-		Use:     "save certificate_id",
-		Args:    cobra.ExactArgs(1),
-		Short:   "Save a certificate and/or a private key to a file",
-		PreRunE: checkSaveFlags,
-		RunE:    save,
-	}
-)
-
-func checkSaveFlags(cmd *cobra.Command, args []string) error {
-	var err error
-	if certificateId, err = strconv.ParseInt(args[0], 10, 64); err != nil {
-		return fmt.Errorf("invalid certificate ID")
-	}
-	if cmd.Flags().Lookup(certFileFlag).Changed {
-		if certificateFile == "" {
-			return fmt.Errorf("certificate file name cannot be empty")
-		}
-	}
-	if cmd.Flags().Lookup(privKeyFileFlag).Changed {
-		if privateKeyFile == "" {
-			return fmt.Errorf("private key file name cannot be empty")
-		}
-		if password == "" {
-			return fmt.Errorf("password cannot be empty")
-		}
-	}
-	return nil
-}
-
-func save(_ *cobra.Command, _ []string) error {
-	db, err := openSQLite()
-	if err != nil {
-		return err
-	}
-	defer closeSQLite(db)
-	if err := initSQLite(db); err != nil {
-		return err
-	}
-
-	if certificateFile != "" {
-		err = saveCertificate(db, certificateId, certificateFile)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("certificate successfully saved to file %s\n", certificateFile)
-	}
-
-	if privateKeyFile != "" {
-		// Retrieve certificate data from database
-		privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-			os.Exit(1)
-		}
-		// Save private key to file
-		err = savePrivateKey(db, privateKeyId, privateKeyFile, password)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-			os.Exit(1)
-		} else {
-			fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)
-		}
-	}
-	return nil
-}
 
 func saveCertificate(db *sql.DB, certificateId int64, filename string) error {
 	// Fetch certificate
@@ -116,10 +46,70 @@ func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) e
 	return nil
 }
 
-func init() {
-	saveCmd.Flags().StringVarP(&certificateFile, certFileFlag, "c", "", "Certificate Output File")
-	saveCmd.Flags().StringVarP(&privateKeyFile, privKeyFileFlag, "k", "", "Private Key Output File")
-	saveCmd.Flags().StringVarP(&password, passwordFlag, "p", "", "Private Key Password")
-	saveCmd.MarkFlagsRequiredTogether(privKeyFileFlag, passwordFlag)
-	rootCmd.AddCommand(saveCmd)
+func newSaveCommand(db *sql.DB) *cobra.Command {
+	var certificateId int64
+	var certificateFile string
+	var privateKeyFile string
+	var password string
+
+	cmd := &cobra.Command{
+		Use:   "save certificate_id",
+		Args:  cobra.ExactArgs(1),
+		Short: "Save a certificate and/or a private key to a file",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			var err error
+			if certificateId, err = strconv.ParseInt(args[0], 10, 64); err != nil {
+				return fmt.Errorf("invalid certificate ID")
+			}
+			if cmd.Flags().Lookup(certFileFlag).Changed {
+				if certificateFile == "" {
+					return fmt.Errorf("certificate file name cannot be empty")
+				}
+			}
+			if cmd.Flags().Lookup(privKeyFileFlag).Changed {
+				if privateKeyFile == "" {
+					return fmt.Errorf("private key file name cannot be empty")
+				}
+				if password == "" {
+					return fmt.Errorf("password cannot be empty")
+				}
+			}
+			return nil
+		},
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if certificateFile != "" {
+				err := saveCertificate(db, certificateId, certificateFile)
+				if err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("certificate successfully saved to file %s\n", certificateFile)
+			}
+
+			if privateKeyFile != "" {
+				// Retrieve certificate data from database
+				privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
+				if err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+					os.Exit(1)
+				}
+				// Save private key to file
+				err = savePrivateKey(db, privateKeyId, privateKeyFile, password)
+				if err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
+					os.Exit(1)
+				} else {
+					fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)
+				}
+			}
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVarP(&certificateFile, certFileFlag, "c", "", "Certificate Output File")
+	f.StringVarP(&privateKeyFile, privKeyFileFlag, "k", "", "Private Key Output File")
+	f.StringVarP(&password, passwordFlag, "p", "", "Private Key Password")
+	cmd.MarkFlagsRequiredTogether(privKeyFileFlag, passwordFlag)
+
+	return cmd
 }
