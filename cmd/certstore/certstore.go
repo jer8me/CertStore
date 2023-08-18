@@ -7,12 +7,6 @@ import (
 
 const version = "0.0.1"
 
-const (
-	certFileFlag    = "cert-file"
-	privKeyFileFlag = "priv-key-file"
-	passwordFlag    = "password"
-)
-
 func errorExit(format string, v ...interface{}) {
 	_, _ = fmt.Fprintf(os.Stderr, format, v...)
 	os.Exit(1)

@@ -12,6 +12,12 @@ import (
 	"strconv"
 )
 
+const (
+	certFileFlag    = "cert-file"
+	privKeyFileFlag = "priv-key-file"
+	passwordFlag    = "password"
+)
+
 func saveCertificate(db *sql.DB, certificateId int64, filename string) error {
 	// Fetch certificate
 	x509Certificate, err := storage.GetX509Certificate(db, certificateId)
