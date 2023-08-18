@@ -43,8 +43,7 @@ func newListCommand(cs CertStore) *cobra.Command {
 			// Fetch certificate
 			certs, err := cs.GetCertificates(&searchFilters)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificates from database: %v\n", err)
-				os.Exit(1)
+				return NewRuntimeError(err)
 			}
 			certificates.PrintCertificates(os.Stdout, certs)
 

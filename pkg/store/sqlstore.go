@@ -32,7 +32,7 @@ func (cs *CertStore) GetCertificate(certificateId int64) (*Certificate, error) {
 		&cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter,
 		&cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent, &cert.PrivateKeyId)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("invalid certificate ID: %d", certificateId)
+		return nil, fmt.Errorf("certificate ID %d does not exist", certificateId)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)

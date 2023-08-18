@@ -7,7 +7,6 @@ import (
 	"github.com/jer8me/CertStore/pkg/common"
 	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/spf13/cobra"
-	"os"
 	"strconv"
 )
 
@@ -85,8 +84,7 @@ func newSaveCommand(cs CertStore) *cobra.Command {
 			if certificateFile != "" {
 				err := saveCertificate(cs, certificateId, certificateFile)
 				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
-					os.Exit(1)
+					return NewRuntimeError(err)
 				}
 				fmt.Printf("certificate successfully saved to file %s\n", certificateFile)
 			}
@@ -95,14 +93,12 @@ func newSaveCommand(cs CertStore) *cobra.Command {
 				// Retrieve certificate data from database
 				privateKeyId, err := cs.GetCertificatePrivateKeyId(certificateId)
 				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-					os.Exit(1)
+					return NewRuntimeError(err)
 				}
 				// Save private key to file
 				err = savePrivateKey(cs, privateKeyId, privateKeyFile, password)
 				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
-					os.Exit(1)
+					return NewRuntimeError(err)
 				} else {
 					fmt.Printf("private key successfully saved to file %s\n", privateKeyFile)
 				}

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/spf13/cobra"
-	"os"
+	"io"
 	"strconv"
 )
 
-func newShowCommand(cs CertStore) *cobra.Command {
+func newShowCommand(cs CertStore, out io.Writer) *cobra.Command {
 	var certificateId int64
 
 	cmd := &cobra.Command{
@@ -26,10 +26,9 @@ func newShowCommand(cs CertStore) *cobra.Command {
 			// Fetch certificate
 			cert, err := cs.GetCertificate(certificateId)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
-				os.Exit(1)
+				return NewRuntimeError(err)
 			}
-			certificates.PrintCertificate(os.Stdout, cert)
+			certificates.PrintCertificate(out, cert)
 
 			return nil
 		},
