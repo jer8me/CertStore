@@ -1,10 +1,8 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"net"
 	"os"
@@ -24,7 +22,7 @@ func ensureHostPort(addr string) (string, error) {
 	return net.JoinHostPort(host, port), nil
 }
 
-func newFetchCommand(db *sql.DB) *cobra.Command {
+func newFetchCommand(cs CertStore) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fetch address [...address]",
 		Args:  cobra.MinimumNArgs(1),
@@ -45,7 +43,7 @@ func newFetchCommand(db *sql.DB) *cobra.Command {
 				}
 				// Store certificates in database
 				for _, x509certificate := range x509certificates {
-					certificateId, err := storage.StoreX509Certificate(db, x509certificate)
+					certificateId, err := cs.StoreX509Certificate(x509certificate)
 					if err == nil {
 						fmt.Printf("Certificate with subject: %s successfully stored (certificate ID=%d)\n", x509certificate.Subject, certificateId)
 					} else {

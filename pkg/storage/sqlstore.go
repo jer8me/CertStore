@@ -13,12 +13,20 @@ import (
 	"strings"
 )
 
-func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
+type CertStore struct {
+	db *sql.DB
+}
+
+func NewCertStore(db *sql.DB) *CertStore {
+	return &CertStore{db: db}
+}
+
+func (cs *CertStore) GetCertificate(certificateId int64) (*Certificate, error) {
 	cert := &Certificate{Id: certificateId}
 	var publicKeyAlgorithmId int
 	var signatureAlgorithmId int
 	// Fetch Certificate object
-	err := db.QueryRow("SELECT publicKey, publicKeyAlgorithm_id, version, serialNumber, subject, "+
+	err := cs.db.QueryRow("SELECT publicKey, publicKeyAlgorithm_id, version, serialNumber, subject, "+
 		"issuer, notBefore, notAfter, signature, signatureAlgorithm_id, isCa, rawContent, privateKey_id "+
 		"FROM Certificate WHERE id = ?", certificateId).Scan(&cert.PublicKey, &publicKeyAlgorithmId,
 		&cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter,
@@ -30,37 +38,37 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 		return nil, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
 	}
 	// Fetch Public Key Algorithm by ID
-	cert.PublicKeyAlgorithm, err = GetPublicKeyAlgorithmName(db, publicKeyAlgorithmId)
+	cert.PublicKeyAlgorithm, err = GetPublicKeyAlgorithmName(cs.db, publicKeyAlgorithmId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query public key algorithm name: %w", err)
 	}
 
 	// Fetch Signature Algorithm by ID
-	cert.SignatureAlgorithm, err = GetSignatureAlgorithmName(db, signatureAlgorithmId)
+	cert.SignatureAlgorithm, err = GetSignatureAlgorithmName(cs.db, signatureAlgorithmId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query signature algorithm name: %w", err)
 	}
 
 	// Fetch Subject Attributes for this certificate ID
-	cert.Subject, err = GetCertificateAttributes(db, certificateId, Subject)
+	cert.Subject, err = GetCertificateAttributes(cs.db, certificateId, Subject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query certificate %s attributes: %w", Subject, err)
 	}
 
 	// Fetch Issuer Attributes for this certificate ID
-	cert.Issuer, err = GetCertificateAttributes(db, certificateId, Issuer)
+	cert.Issuer, err = GetCertificateAttributes(cs.db, certificateId, Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query certificate %s attributes: %w", Issuer, err)
 	}
 
 	// Fetch Key Usages for this certificate ID
-	cert.KeyUsages, err = GetCertificateKeyUsages(db, certificateId)
+	cert.KeyUsages, err = GetCertificateKeyUsages(cs.db, certificateId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query key usages: %w", err)
 	}
 
 	// Fetch SANs for this certificate ID
-	cert.SANs, err = GetCertificateSANs(db, certificateId)
+	cert.SANs, err = GetCertificateSANs(cs.db, certificateId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query SANs: %w", err)
 	}
@@ -68,146 +76,25 @@ func GetCertificate(db *sql.DB, certificateId int64) (*Certificate, error) {
 	return cert, nil
 }
 
-func GetX509Certificate(db *sql.DB, certificateId int64) (*x509.Certificate, error) {
-	var der []byte
-	// Fetch raw certificate
-	err := db.QueryRow("SELECT rawContent FROM Certificate WHERE id = ?", certificateId).Scan(&der)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("GetX509Certificate: invalid certificate ID: %d", certificateId)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("GetX509Certificate: failed to query certificate ID %d: %w", certificateId, err)
-	}
-	x509Certificate, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, fmt.Errorf("GetX509Certificate: failed to parse certificate ID %d: %w", certificateId, err)
-	}
-	return x509Certificate, nil
-}
-
-func GetCertificates(db *sql.DB, searchFilters *SearchFilter) ([]*Certificate, error) {
-	query, args := SearchQuery(searchFilters)
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// A map of string slices to hold data from returned rows.
-	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
-	// The value is a slice of strings containing the SANs for the type.
-	var certificates []*Certificate
-
-	// Loop through rows, using Scan to assign column data to struct fields.
-	for rows.Next() {
-		cert := &Certificate{}
-		if err := rows.Scan(&cert.Id, &cert.PublicKeyAlgorithm, &cert.Version, &cert.SerialNumber,
-			&cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter, &cert.IsCA, &cert.PrivateKeyId); err != nil {
-			// Error happened while scanning rows: return the rows we scanned so far and the error
-			return certificates, err
-		}
-		certificates = append(certificates, cert)
-	}
-	// Check if an error happened during the iteration
-	if err = rows.Err(); err != nil {
-		return certificates, err
-	}
-	return certificates, nil
-}
-
-func SearchQuery(searchFilters *SearchFilter) (string, []any) {
-	qb := NewQueryBuilder()
-	qb.WriteString("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, c.notAfter, c.isCa, c.privateKey_id ")
-	qb.WriteString("FROM Certificate c INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id ")
-	// Setup potential filtering
-	qb.WriteString("WHERE c.id IN(")
-	if !searchFilters.ExpireBefore.IsZero() {
-		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE notAfter", "<", searchFilters.ExpireBefore)
-	}
-	qb.FilterLike("SELECT DISTINCT cs.certificate_id FROM SubjectAlternateName sa JOIN CertificateSAN cs ON sa.id = cs.subjectAlternateName_id WHERE sa.name", searchFilters.San)
-	qb.FilterLike("SELECT DISTINCT id FROM Certificate WHERE serialNumber", searchFilters.Serial)
-	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND value", searchFilters.Issuer)
-	if searchFilters.Issuer == "" {
-		// If the global Issuer search is not used, look into each Issuer field
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.3' AND value", searchFilters.IssuerCn)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.6' AND value", searchFilters.IssuerCountry)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.7' AND value", searchFilters.IssuerLocality)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.8' AND value", searchFilters.IssuerState)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.9' AND value", searchFilters.IssuerStreet)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.10' AND value", searchFilters.IssuerOrg)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.11' AND value", searchFilters.IssuerOrgUnit)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.17' AND value", searchFilters.IssuerPostalCode)
-	}
-	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND value", searchFilters.Subject)
-	if searchFilters.Subject == "" {
-		// If the global Subject search is not used, look into each Subject field
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.3' AND value", searchFilters.SubjectCn)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.6' AND value", searchFilters.SubjectCountry)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.7' AND value", searchFilters.SubjectLocality)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.8' AND value", searchFilters.SubjectState)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.9' AND value", searchFilters.SubjectStreet)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.10' AND value", searchFilters.SubjectOrg)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.11' AND value", searchFilters.SubjectOrgUnit)
-		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.17' AND value", searchFilters.SubjectPostalCode)
-	}
-	// Public Key Algorithms
-	if len(searchFilters.PublicKeyAlgorithms) > 0 {
-		// Convert all string values to upper case because the IN operator is case-insensitive
-		var pkas []any
-		for _, pka := range searchFilters.PublicKeyAlgorithms {
-			pkas = append(pkas, strings.ToUpper(pka))
-		}
-		qb.FilterIn("SELECT DISTINCT cert.id FROM Certificate cert JOIN PublicKeyAlgorithm pka ON cert.publicKeyAlgorithm_id = pka.id WHERE UPPER(pka.name)", pkas)
-	}
-	// Is CA
-	isCA := -1
-	if searchFilters.IsCA {
-		isCA = 1
-	} else if searchFilters.NotCA {
-		isCA = 0
-	}
-	if (isCA == 0) || (isCA == 1) {
-		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE isCa", "=", isCA)
-	}
-	// Has Private Key
-	var condition string
-	if searchFilters.HasPrivateKey {
-		condition = "NOT NULL"
-	} else if searchFilters.NoPrivateKey {
-		condition = "IS NULL"
-	}
-	if condition != "" {
-		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id ", condition)
-	}
-
-	if !qb.HasFilter {
-		// No filtering: include all certificate IDs
-		qb.WriteString("c.id")
-	}
-	qb.WriteString(")")
-
-	return qb.String(), qb.Args
-}
-
-func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, error) {
+func (cs *CertStore) StoreCertificate(cert *Certificate, linkCert bool) (int64, error) {
 
 	// Get public key algorithm ID for string
-	publicKeyAlgorithmId, err := GetPublicKeyAlgorithmId(db, cert.PublicKeyAlgorithm)
+	publicKeyAlgorithmId, err := GetPublicKeyAlgorithmId(cs.db, cert.PublicKeyAlgorithm)
 	if err != nil {
 		return 0, err
 	}
 	// Get signature algorithm ID for string
-	signatureAlgorithmId, err := GetSignatureAlgorithmId(db, cert.SignatureAlgorithm)
+	signatureAlgorithmId, err := GetSignatureAlgorithmId(cs.db, cert.SignatureAlgorithm)
 	if err != nil {
 		return 0, err
 	}
 	// Get SAN types
-	sanTypes, err := GetSANTypes(db)
+	sanTypes, err := GetSANTypes(cs.db)
 	if err != nil {
 		return 0, err
 	}
 	// Get attribute types
-	attributeTypes, err := GetAttributeTypes(db)
+	attributeTypes, err := GetAttributeTypes(cs.db)
 	if err != nil {
 		return 0, err
 	}
@@ -216,7 +103,7 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 	ctx := context.Background()
 
 	// Get a Tx for making transaction requests.
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := cs.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -370,17 +257,72 @@ func StoreCertificate(db *sql.DB, cert *Certificate, linkCert bool) (int64, erro
 	return certificateId, err
 }
 
-// StoreX509Certificate stores an X.509 certificate structure into the database
-func StoreX509Certificate(db *sql.DB, x509cert *x509.Certificate) (int64, error) {
-	// Transform x509 certificate to certificate DB model
-	certificate := ToCertificate(x509cert)
-	return StoreCertificate(db, certificate, true)
+func (cs *CertStore) GetCertificates(searchFilters *SearchFilter) ([]*Certificate, error) {
+	query, args := SearchQuery(searchFilters)
+	rows, err := cs.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// A map of string slices to hold data from returned rows.
+	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
+	// The value is a slice of strings containing the SANs for the type.
+	var certificates []*Certificate
+
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		cert := &Certificate{}
+		if err := rows.Scan(&cert.Id, &cert.PublicKeyAlgorithm, &cert.Version, &cert.SerialNumber,
+			&cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter, &cert.IsCA, &cert.PrivateKeyId); err != nil {
+			// Error happened while scanning rows: return the rows we scanned so far and the error
+			return certificates, err
+		}
+		certificates = append(certificates, cert)
+	}
+	// Check if an error happened during the iteration
+	if err = rows.Err(); err != nil {
+		return certificates, err
+	}
+	return certificates, nil
 }
 
-func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, error) {
+func (cs *CertStore) GetCertificatePrivateKeyId(certificateId int64) (int64, error) {
+	var privateKeyId sql.NullInt64
+	// Fetch Certificate object
+	err := cs.db.QueryRow("SELECT privateKey_id FROM Certificate WHERE id = ?", certificateId).Scan(&privateKeyId)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("invalid certificate ID: %d", certificateId)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
+	}
+	if !privateKeyId.Valid {
+		// Certificate does not have a private key
+		return 0, errors.New("certificate does not have a private key")
+	}
+	return privateKeyId.Int64, nil
+}
+
+func (cs *CertStore) GetPrivateKey(privateKeyId int64) (*PrivateKey, error) {
+	privateKey := &PrivateKey{Id: privateKeyId}
+	// Fetch Private Key
+	err := cs.db.QueryRow("SELECT pk.encryptedPkcs8, pkt.type, pk.pemType, pk.dataEncryptionKey, pk.SHA256Fingerprint FROM PrivateKey pk "+
+		"INNER JOIN PrivateKeyType pkt ON pk.privateKeyType_id = pkt.id WHERE pk.id = ?", privateKeyId).Scan(&privateKey.EncryptedPKCS8,
+		&privateKey.Type, &privateKey.PEMType, &privateKey.DataEncryptionKey, &privateKey.SHA256Fingerprint)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
+	}
+	return privateKey, nil
+}
+
+func (cs *CertStore) StorePrivateKey(privateKey *PrivateKey, linkCert bool) (int64, error) {
 
 	// Get private key type ID
-	privateKeyTypeId, err := GetPrivateKeyTypeId(db, privateKey.Type)
+	privateKeyTypeId, err := GetPrivateKeyTypeId(cs.db, privateKey.Type)
 	if err != nil {
 		return 0, err
 	}
@@ -389,7 +331,7 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 	ctx := context.Background()
 
 	// Get a Tx for making transaction requests.
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := cs.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -461,6 +403,104 @@ func StorePrivateKey(db *sql.DB, privateKey *PrivateKey, linkCert bool) (int64, 
 	return privateKeyId, nil
 }
 
+func (cs *CertStore) GetX509Certificate(certificateId int64) (*x509.Certificate, error) {
+	var der []byte
+	// Fetch raw certificate
+	err := cs.db.QueryRow("SELECT rawContent FROM Certificate WHERE id = ?", certificateId).Scan(&der)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("GetX509Certificate: invalid certificate ID: %d", certificateId)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("GetX509Certificate: failed to query certificate ID %d: %w", certificateId, err)
+	}
+	x509Certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, fmt.Errorf("GetX509Certificate: failed to parse certificate ID %d: %w", certificateId, err)
+	}
+	return x509Certificate, nil
+}
+
+// StoreX509Certificate stores an X.509 certificate structure into the database
+func (cs *CertStore) StoreX509Certificate(x509cert *x509.Certificate) (int64, error) {
+	// Transform x509 certificate to certificate DB model
+	certificate := ToCertificate(x509cert)
+	return cs.StoreCertificate(certificate, true)
+}
+
+func SearchQuery(searchFilters *SearchFilter) (string, []any) {
+	qb := NewQueryBuilder()
+	qb.WriteString("SELECT c.id, pka.name, c.version, c.serialNumber, c.subject, c.issuer, c.notBefore, c.notAfter, c.isCa, c.privateKey_id ")
+	qb.WriteString("FROM Certificate c INNER JOIN PublicKeyAlgorithm pka ON c.publicKeyAlgorithm_id = pka.id ")
+	// Setup potential filtering
+	qb.WriteString("WHERE c.id IN(")
+	if !searchFilters.ExpireBefore.IsZero() {
+		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE notAfter", "<", searchFilters.ExpireBefore)
+	}
+	qb.FilterLike("SELECT DISTINCT cs.certificate_id FROM SubjectAlternateName sa JOIN CertificateSAN cs ON sa.id = cs.subjectAlternateName_id WHERE sa.name", searchFilters.San)
+	qb.FilterLike("SELECT DISTINCT id FROM Certificate WHERE serialNumber", searchFilters.Serial)
+	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND value", searchFilters.Issuer)
+	if searchFilters.Issuer == "" {
+		// If the global Issuer search is not used, look into each Issuer field
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.3' AND value", searchFilters.IssuerCn)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.6' AND value", searchFilters.IssuerCountry)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.7' AND value", searchFilters.IssuerLocality)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.8' AND value", searchFilters.IssuerState)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.9' AND value", searchFilters.IssuerStreet)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.10' AND value", searchFilters.IssuerOrg)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.11' AND value", searchFilters.IssuerOrgUnit)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Issuer' AND oid = '2.5.4.17' AND value", searchFilters.IssuerPostalCode)
+	}
+	qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND value", searchFilters.Subject)
+	if searchFilters.Subject == "" {
+		// If the global Subject search is not used, look into each Subject field
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.3' AND value", searchFilters.SubjectCn)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.6' AND value", searchFilters.SubjectCountry)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.7' AND value", searchFilters.SubjectLocality)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.8' AND value", searchFilters.SubjectState)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.9' AND value", searchFilters.SubjectStreet)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.10' AND value", searchFilters.SubjectOrg)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.11' AND value", searchFilters.SubjectOrgUnit)
+		qb.FilterLike("SELECT DISTINCT certificate_id FROM CertificateAttribute WHERE type = 'Subject' AND oid = '2.5.4.17' AND value", searchFilters.SubjectPostalCode)
+	}
+	// Public Key Algorithms
+	if len(searchFilters.PublicKeyAlgorithms) > 0 {
+		// Convert all string values to upper case because the IN operator is case-insensitive
+		var pkas []any
+		for _, pka := range searchFilters.PublicKeyAlgorithms {
+			pkas = append(pkas, strings.ToUpper(pka))
+		}
+		qb.FilterIn("SELECT DISTINCT cert.id FROM Certificate cert JOIN PublicKeyAlgorithm pka ON cert.publicKeyAlgorithm_id = pka.id WHERE UPPER(pka.name)", pkas)
+	}
+	// Is CA
+	isCA := -1
+	if searchFilters.IsCA {
+		isCA = 1
+	} else if searchFilters.NotCA {
+		isCA = 0
+	}
+	if (isCA == 0) || (isCA == 1) {
+		qb.FilterCompare("SELECT DISTINCT id FROM Certificate WHERE isCa", "=", isCA)
+	}
+	// Has Private Key
+	var condition string
+	if searchFilters.HasPrivateKey {
+		condition = "NOT NULL"
+	} else if searchFilters.NoPrivateKey {
+		condition = "IS NULL"
+	}
+	if condition != "" {
+		qb.Filter("SELECT DISTINCT id FROM Certificate WHERE privateKey_id ", condition)
+	}
+
+	if !qb.HasFilter {
+		// No filtering: include all certificate IDs
+		qb.WriteString("c.id")
+	}
+	qb.WriteString(")")
+
+	return qb.String(), qb.Args
+}
+
 // FindCertificateByPublicKey returns a slice of certificate IDs with the public key provided
 func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
 	// Compute SHA-256
@@ -495,38 +535,6 @@ func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
 		return nil, err
 	}
 	return certificateIds, nil
-}
-
-func GetPrivateKey(db *sql.DB, privateKeyId int64) (*PrivateKey, error) {
-	privateKey := &PrivateKey{Id: privateKeyId}
-	// Fetch Private Key
-	err := db.QueryRow("SELECT pk.encryptedPkcs8, pkt.type, pk.pemType, pk.dataEncryptionKey, pk.SHA256Fingerprint FROM PrivateKey pk "+
-		"INNER JOIN PrivateKeyType pkt ON pk.privateKeyType_id = pkt.id WHERE pk.id = ?", privateKeyId).Scan(&privateKey.EncryptedPKCS8,
-		&privateKey.Type, &privateKey.PEMType, &privateKey.DataEncryptionKey, &privateKey.SHA256Fingerprint)
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
-	}
-	return privateKey, nil
-}
-
-func GetCertificatePrivateKeyId(db *sql.DB, certificateId int64) (int64, error) {
-	var privateKeyId sql.NullInt64
-	// Fetch Certificate object
-	err := db.QueryRow("SELECT privateKey_id FROM Certificate WHERE id = ?", certificateId).Scan(&privateKeyId)
-	if err == sql.ErrNoRows {
-		return 0, fmt.Errorf("invalid certificate ID: %d", certificateId)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
-	}
-	if !privateKeyId.Valid {
-		// Certificate does not have a private key
-		return 0, errors.New("certificate does not have a private key")
-	}
-	return privateKeyId.Int64, nil
 }
 
 // GetPublicKeyAlgorithmId looks up the ID for a PublicKeyAlgorithm string

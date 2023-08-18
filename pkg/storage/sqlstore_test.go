@@ -33,7 +33,7 @@ func closeDB(t *testing.T, db *sql.DB) {
 	require.NoError(t, err, "failed to close database")
 }
 
-func loadCertificate(t *testing.T, db *sql.DB, filename string) int64 {
+func loadCertificate(t *testing.T, cs *storage.CertStore, filename string) int64 {
 	// Read certificate file
 	certs, privateKeys, err := certificates.ParsePEMFile(certPath(filename))
 	require.NoError(t, err, "failed to read certificate file")
@@ -41,7 +41,7 @@ func loadCertificate(t *testing.T, db *sql.DB, filename string) int64 {
 	require.Len(t, certs, 1, "expected exactly one certificate")
 
 	// Store certificate in database
-	certificateId, err := storage.StoreCertificate(db, storage.ToCertificate(certs[0]), false)
+	certificateId, err := cs.StoreCertificate(storage.ToCertificate(certs[0]), false)
 	require.NoError(t, err, "failed to store certificate")
 	return certificateId
 }
@@ -52,9 +52,10 @@ func TestGetCertificate(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
+	cs := storage.NewCertStore(db)
 
-	certificateId := loadCertificate(t, db, "champlain.crt")
-	cert, err := storage.GetCertificate(db, certificateId)
+	certificateId := loadCertificate(t, cs, "champlain.crt")
+	cert, err := cs.GetCertificate(certificateId)
 	if err != nil {
 		require.NoError(t, err, "failed to get certificate")
 	}
@@ -67,11 +68,12 @@ func TestGetCertificates(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
+	cs := storage.NewCertStore(db)
 
-	certificateId := loadCertificate(t, db, "selfsigned.crt")
+	certificateId := loadCertificate(t, cs, "selfsigned.crt")
 	// Test special characters in subject search
 	searchFilter := &storage.SearchFilter{Subject: `/%__%\`}
-	got, err := storage.GetCertificates(db, searchFilter)
+	got, err := cs.GetCertificates(searchFilter)
 	if err != nil {
 		require.NoError(t, err, "failed to get certificates")
 	}
@@ -94,8 +96,9 @@ func TestStoreCertificate(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
+	cs := storage.NewCertStore(db)
 
-	certificateId, err := storage.StoreCertificate(db, certificate, false)
+	certificateId, err := cs.StoreCertificate(certificate, false)
 	if err != nil {
 		require.NoError(t, err, "failed to store certificate")
 	}
@@ -296,6 +299,7 @@ func TestStorePrivateKey(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
+	cs := storage.NewCertStore(db)
 
 	password := "password123"
 
@@ -310,11 +314,11 @@ func TestStorePrivateKey(t *testing.T) {
 	require.NoError(t, err, "failed to encrypt private key")
 
 	// Store private key in database
-	privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey, false)
+	privateKeyId, err := cs.StorePrivateKey(encryptedPrivateKey, false)
 	require.NoError(t, err, "failed to store private key")
 
 	// Read stored encrypted private key
-	privateKeyFound, err := storage.GetPrivateKey(db, privateKeyId)
+	privateKeyFound, err := cs.GetPrivateKey(privateKeyId)
 	require.NoError(t, err, "failed to get private key")
 
 	// Decrypt private key fetched from database

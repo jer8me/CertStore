@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/common"
@@ -11,7 +10,7 @@ import (
 	"time"
 )
 
-func newListCommand(db *sql.DB) *cobra.Command {
+func newListCommand(cs CertStore) *cobra.Command {
 
 	// Cobra does not parse dates directly
 	// Use a temporary string variable to store the command line argument
@@ -42,7 +41,7 @@ func newListCommand(db *sql.DB) *cobra.Command {
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Fetch certificate
-			certs, err := storage.GetCertificates(db, &searchFilters)
+			certs, err := cs.GetCertificates(&searchFilters)
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificates from database: %v\n", err)
 				os.Exit(1)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/x509"
-	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/common"
@@ -11,7 +10,7 @@ import (
 	"os"
 )
 
-func newStoreCommand(db *sql.DB) *cobra.Command {
+func newStoreCommand(cs CertStore) *cobra.Command {
 	var password string
 	var certs []*x509.Certificate
 	var privateKeys []*common.PrivateKey
@@ -40,7 +39,7 @@ func newStoreCommand(db *sql.DB) *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Store certificates in database
 			for _, cert := range certs {
-				certificateId, err := storage.StoreX509Certificate(db, cert)
+				certificateId, err := cs.StoreX509Certificate(cert)
 				if err == nil {
 					_, _ = fmt.Printf("Certificate %v successfully stored (certificate ID=%d)\n", cert.Subject, certificateId)
 				} else {
@@ -54,7 +53,7 @@ func newStoreCommand(db *sql.DB) *cobra.Command {
 					_, _ = fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
 					continue
 				}
-				privateKeyId, err := storage.StorePrivateKey(db, encryptedPrivateKey, true)
+				privateKeyId, err := cs.StorePrivateKey(encryptedPrivateKey, true)
 				if err == nil {
 					fmt.Printf("%s private key successfully stored (private key ID=%d)\n", privateKey.Type(), privateKeyId)
 				} else {

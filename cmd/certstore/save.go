@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
@@ -18,9 +17,9 @@ const (
 	passwordFlag    = "password"
 )
 
-func saveCertificate(db *sql.DB, certificateId int64, filename string) error {
+func saveCertificate(cs CertStore, certificateId int64, filename string) error {
 	// Fetch certificate
-	x509Certificate, err := storage.GetX509Certificate(db, certificateId)
+	x509Certificate, err := cs.GetX509Certificate(certificateId)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve certificate from database: %w", err)
 	}
@@ -32,9 +31,9 @@ func saveCertificate(db *sql.DB, certificateId int64, filename string) error {
 	return nil
 }
 
-func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) error {
+func savePrivateKey(cs CertStore, privateKeyId int64, filename, password string) error {
 	// Fetch private key
-	encryptedPrivateKey, err := storage.GetPrivateKey(db, privateKeyId)
+	encryptedPrivateKey, err := cs.GetPrivateKey(privateKeyId)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve private key from database: %w", err)
 	}
@@ -52,7 +51,7 @@ func savePrivateKey(db *sql.DB, privateKeyId int64, filename, password string) e
 	return nil
 }
 
-func newSaveCommand(db *sql.DB) *cobra.Command {
+func newSaveCommand(cs CertStore) *cobra.Command {
 	var certificateId int64
 	var certificateFile string
 	var privateKeyFile string
@@ -84,7 +83,7 @@ func newSaveCommand(db *sql.DB) *cobra.Command {
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if certificateFile != "" {
-				err := saveCertificate(db, certificateId, certificateFile)
+				err := saveCertificate(cs, certificateId, certificateFile)
 				if err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "failed to save certificate: %s\n", err)
 					os.Exit(1)
@@ -94,13 +93,13 @@ func newSaveCommand(db *sql.DB) *cobra.Command {
 
 			if privateKeyFile != "" {
 				// Retrieve certificate data from database
-				privateKeyId, err := storage.GetCertificatePrivateKeyId(db, certificateId)
+				privateKeyId, err := cs.GetCertificatePrivateKeyId(certificateId)
 				if err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
 					os.Exit(1)
 				}
 				// Save private key to file
-				err = savePrivateKey(db, privateKeyId, privateKeyFile, password)
+				err = savePrivateKey(cs, privateKeyId, privateKeyFile, password)
 				if err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "failed to save private key: %s\n", err)
 					os.Exit(1)

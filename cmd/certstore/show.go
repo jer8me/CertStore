@@ -1,16 +1,14 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/storage"
 	"github.com/spf13/cobra"
 	"os"
 	"strconv"
 )
 
-func newShowCommand(db *sql.DB) *cobra.Command {
+func newShowCommand(cs CertStore) *cobra.Command {
 	var certificateId int64
 
 	cmd := &cobra.Command{
@@ -26,7 +24,7 @@ func newShowCommand(db *sql.DB) *cobra.Command {
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Fetch certificate
-			cert, err := storage.GetCertificate(db, certificateId)
+			cert, err := cs.GetCertificate(certificateId)
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "failed to retrieve certificate from database: %v\n", err)
 				os.Exit(1)
