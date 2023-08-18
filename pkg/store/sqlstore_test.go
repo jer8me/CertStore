@@ -1,11 +1,11 @@
-package storage_test
+package store_test
 
 import (
 	"crypto/rsa"
 	"database/sql"
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
@@ -18,13 +18,13 @@ import (
 func openDB(t *testing.T) *sql.DB {
 	dbpath := path.Join(t.TempDir(), "test.db")
 	// Connect to database
-	db, err := storage.OpenDatabase(dbpath)
+	db, err := store.OpenDatabase(dbpath)
 	require.NoError(t, err, "failed to open database '%s'", dbpath)
 	return db
 }
 
 func initDB(t *testing.T, db *sql.DB) {
-	err := storage.InitDatabase(db)
+	err := store.InitDatabase(db)
 	require.NoError(t, err, "failed to initialize database")
 }
 
@@ -33,7 +33,7 @@ func closeDB(t *testing.T, db *sql.DB) {
 	require.NoError(t, err, "failed to close database")
 }
 
-func loadCertificate(t *testing.T, cs *storage.CertStore, filename string) int64 {
+func loadCertificate(t *testing.T, cs *store.CertStore, filename string) int64 {
 	// Read certificate file
 	certs, privateKeys, err := certificates.ParsePEMFile(certPath(filename))
 	require.NoError(t, err, "failed to read certificate file")
@@ -41,7 +41,7 @@ func loadCertificate(t *testing.T, cs *storage.CertStore, filename string) int64
 	require.Len(t, certs, 1, "expected exactly one certificate")
 
 	// Store certificate in database
-	certificateId, err := cs.StoreCertificate(storage.ToCertificate(certs[0]), false)
+	certificateId, err := cs.StoreCertificate(store.ToCertificate(certs[0]), false)
 	require.NoError(t, err, "failed to store certificate")
 	return certificateId
 }
@@ -52,7 +52,7 @@ func TestGetCertificate(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
-	cs := storage.NewCertStore(db)
+	cs := store.NewCertStore(db)
 
 	certificateId := loadCertificate(t, cs, "champlain.crt")
 	cert, err := cs.GetCertificate(certificateId)
@@ -68,11 +68,11 @@ func TestGetCertificates(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
-	cs := storage.NewCertStore(db)
+	cs := store.NewCertStore(db)
 
 	certificateId := loadCertificate(t, cs, "selfsigned.crt")
 	// Test special characters in subject search
-	searchFilter := &storage.SearchFilter{Subject: `/%__%\`}
+	searchFilter := &store.SearchFilter{Subject: `/%__%\`}
 	got, err := cs.GetCertificates(searchFilter)
 	if err != nil {
 		require.NoError(t, err, "failed to get certificates")
@@ -90,13 +90,13 @@ func TestStoreCertificate(t *testing.T) {
 	assert.Len(t, certs, 1, "expected exactly one certificate")
 
 	// Transform x509 certificate to certificate DB model
-	certificate := storage.ToCertificate(certs[0])
+	certificate := store.ToCertificate(certs[0])
 
 	// Connect to database
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
-	cs := storage.NewCertStore(db)
+	cs := store.NewCertStore(db)
 
 	certificateId, err := cs.StoreCertificate(certificate, false)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestGetPublicKeyAlgorithmId(t *testing.T) {
 			name = "Test" + tt.publicKeyAlgorithm + "PublicKeyAlgorithmId"
 		}
 		t.Run(name, func(t *testing.T) {
-			got, err := storage.GetPublicKeyAlgorithmId(db, tt.publicKeyAlgorithm)
+			got, err := store.GetPublicKeyAlgorithmId(db, tt.publicKeyAlgorithm)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetPublicKeyAlgorithmId(%s)", tt.publicKeyAlgorithm)) {
 				return
 			}
@@ -161,7 +161,7 @@ func TestGetPublicKeyAlgorithmName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := storage.GetPublicKeyAlgorithmName(db, tt.publicKeyAlgorithmId)
+			got, err := store.GetPublicKeyAlgorithmName(db, tt.publicKeyAlgorithmId)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetPublicKeyAlgorithmName(%v)", tt.publicKeyAlgorithmId)) {
 				return
 			}
@@ -208,7 +208,7 @@ func TestGetSignatureAlgorithmId(t *testing.T) {
 			name = "Test" + strings.ReplaceAll(tt.signatureAlgorithm, "-", "With") + "SignatureAlgorithmId"
 		}
 		t.Run(name, func(t *testing.T) {
-			got, err := storage.GetSignatureAlgorithmId(db, tt.signatureAlgorithm)
+			got, err := store.GetSignatureAlgorithmId(db, tt.signatureAlgorithm)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetSignatureAlgorithmId(%s)", tt.signatureAlgorithm)) {
 				return
 			}
@@ -240,7 +240,7 @@ func TestGetSignatureAlgorithmName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := storage.GetSignatureAlgorithmName(db, tt.signatureAlgorithmId)
+			got, err := store.GetSignatureAlgorithmName(db, tt.signatureAlgorithmId)
 			if !tt.wantErr(t, err, fmt.Sprintf("GetSignatureAlgorithmName(%v)", tt.signatureAlgorithmId)) {
 				return
 			}
@@ -257,7 +257,7 @@ func TestGetSANTypes(t *testing.T) {
 	defer closeDB(t, db)
 	initDB(t, db)
 
-	sanTypes, err := storage.GetSANTypes(db)
+	sanTypes, err := store.GetSANTypes(db)
 	if err != nil {
 		require.NoError(t, err, "failed to get SAN types")
 	}
@@ -269,7 +269,7 @@ func TestGetSANTypes(t *testing.T) {
 		assert.False(t, slices.Contains(sanNames, sanType.Name), "duplicate SAN type name")
 		sanNames = append(sanNames, sanType.Name)
 	}
-	assert.Subset(t, sanNames, []string{storage.DnsName, storage.EmailAddress, storage.IpAddress, storage.URI})
+	assert.Subset(t, sanNames, []string{store.DnsName, store.EmailAddress, store.IpAddress, store.URI})
 }
 
 // TestGetAttributeTypes tests the general sanity of the data populated in the AttributeType table
@@ -280,7 +280,7 @@ func TestGetAttributeTypes(t *testing.T) {
 	defer closeDB(t, db)
 	initDB(t, db)
 
-	attributeTypes, err := storage.GetAttributeTypes(db)
+	attributeTypes, err := store.GetAttributeTypes(db)
 	if err != nil {
 		require.NoError(t, err, "failed to get attribute types")
 	}
@@ -299,7 +299,7 @@ func TestStorePrivateKey(t *testing.T) {
 	db := openDB(t)
 	defer closeDB(t, db)
 	initDB(t, db)
-	cs := storage.NewCertStore(db)
+	cs := store.NewCertStore(db)
 
 	password := "password123"
 
@@ -310,7 +310,7 @@ func TestStorePrivateKey(t *testing.T) {
 	assert.Len(t, privateKeys, 1, "expected exactly one private key")
 	rsaPrivateKey := privateKeys[0]
 
-	encryptedPrivateKey, err := storage.EncryptPrivateKey(rsaPrivateKey, password)
+	encryptedPrivateKey, err := store.EncryptPrivateKey(rsaPrivateKey, password)
 	require.NoError(t, err, "failed to encrypt private key")
 
 	// Store private key in database
@@ -322,7 +322,7 @@ func TestStorePrivateKey(t *testing.T) {
 	require.NoError(t, err, "failed to get private key")
 
 	// Decrypt private key fetched from database
-	privateKey, err := storage.DecryptPrivateKey(privateKeyFound, password)
+	privateKey, err := store.DecryptPrivateKey(privateKeyFound, password)
 	require.NoError(t, err, "failed to decrypt private key")
 
 	assert.Equal(t, "RSA PRIVATE KEY", privateKey.PEMType)

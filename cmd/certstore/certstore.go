@@ -3,18 +3,18 @@ package main
 import (
 	"crypto/x509"
 	"fmt"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"os"
 )
 
 const version = "0.0.1"
 
 type CertStore interface {
-	GetCertificate(certificateId int64) (*storage.Certificate, error)
-	GetCertificates(searchFilters *storage.SearchFilter) ([]*storage.Certificate, error)
+	GetCertificate(certificateId int64) (*store.Certificate, error)
+	GetCertificates(searchFilters *store.SearchFilter) ([]*store.Certificate, error)
 	GetCertificatePrivateKeyId(certificateId int64) (int64, error)
-	GetPrivateKey(privateKeyId int64) (*storage.PrivateKey, error)
-	StorePrivateKey(privateKey *storage.PrivateKey, linkCert bool) (int64, error)
+	GetPrivateKey(privateKeyId int64) (*store.PrivateKey, error)
+	StorePrivateKey(privateKey *store.PrivateKey, linkCert bool) (int64, error)
 	GetX509Certificate(certificateId int64) (*x509.Certificate, error)
 	StoreX509Certificate(x509cert *x509.Certificate) (int64, error)
 }
@@ -35,7 +35,7 @@ func main() {
 		errorExit("%s", err)
 	}
 
-	cs := storage.NewCertStore(db)
+	cs := store.NewCertStore(db)
 	cmd := newRootCommand(cs)
 	if err := cmd.Execute(); err != nil {
 		// Exit with an error code

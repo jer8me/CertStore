@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/common"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -48,7 +48,7 @@ func newStoreCommand(cs CertStore) *cobra.Command {
 			}
 			// Store private keys in database
 			for _, privateKey := range privateKeys {
-				encryptedPrivateKey, err := storage.EncryptPrivateKey(privateKey, password)
+				encryptedPrivateKey, err := store.EncryptPrivateKey(privateKey, password)
 				if err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "failed to encrypt private key: %v\n", err)
 					continue

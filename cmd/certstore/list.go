@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/common"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/spf13/cobra"
 	"os"
 	"time"
@@ -17,7 +17,7 @@ func newListCommand(cs CertStore) *cobra.Command {
 	// The data will be parsed and adjusted in the PreRun function
 	var expireBefore string
 
-	var searchFilters storage.SearchFilter
+	var searchFilters store.SearchFilter
 
 	cmd := &cobra.Command{
 		Use:   "list",

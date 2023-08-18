@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"os"
 )
 
@@ -11,11 +11,11 @@ const dbpath = "~/.certstore/certstore.db"
 
 // openSQLite opens a new connection to a SQLite database
 func openSQLite() (*sql.DB, error) {
-	return storage.OpenDatabase(dbpath)
+	return store.OpenDatabase(dbpath)
 }
 
 func initSQLite(db *sql.DB) error {
-	return storage.InitDatabase(db)
+	return store.InitDatabase(db)
 }
 
 func closeSQLite(db *sql.DB) {

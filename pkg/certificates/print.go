@@ -9,7 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"io"
 	"strconv"
 	"strings"
@@ -83,7 +83,7 @@ func PrintPublicKey(w io.Writer, b []byte, indent int) {
 }
 
 // PrintCertificate prints a certificate in a human-readable format
-func PrintCertificate(w io.Writer, cert *storage.Certificate) {
+func PrintCertificate(w io.Writer, cert *store.Certificate) {
 	fmt.Fprintln(w, "Certificate:")
 	fmt.Fprintf(w, "  Version: %d\n", cert.Version)
 	fmt.Fprintf(w, "  Serial Number: %s\n", cert.SerialNumber)
@@ -127,7 +127,7 @@ func PrintCertificate(w io.Writer, cert *storage.Certificate) {
 	fmt.Fprintln(w)
 }
 
-func PrintCertificates(w io.Writer, certs []*storage.Certificate) {
+func PrintCertificates(w io.Writer, certs []*store.Certificate) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tPUBLIC KEY\tVERSION\tSERIAL NUMBER\tSUBJECT\tISSUER\tNOT BEFORE\tNOT AFTER\tIS CA\tPRIV KEY")
 	for _, cert := range certs {

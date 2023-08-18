@@ -3,7 +3,7 @@ package certificates_test
 import (
 	"bytes"
 	"github.com/jer8me/CertStore/pkg/certificates"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"path"
@@ -49,7 +49,7 @@ func TestPrintCertificate(t *testing.T) {
 	assert.Nil(t, privateKeys, "unexpected private key found")
 	assert.Len(t, certs, 1, "expected exactly one certificate")
 
-	certificate := storage.ToCertificate(certs[0])
+	certificate := store.ToCertificate(certs[0])
 
 	var sb strings.Builder
 	certificates.PrintCertificate(&sb, certificate)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/jer8me/CertStore/pkg/certificates"
 	"github.com/jer8me/CertStore/pkg/common"
-	"github.com/jer8me/CertStore/pkg/storage"
+	"github.com/jer8me/CertStore/pkg/store"
 	"github.com/spf13/cobra"
 	"os"
 	"strconv"
@@ -37,7 +37,7 @@ func savePrivateKey(cs CertStore, privateKeyId int64, filename, password string)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve private key from database: %w", err)
 	}
-	privateKey, err := storage.DecryptPrivateKey(encryptedPrivateKey, password)
+	privateKey, err := store.DecryptPrivateKey(encryptedPrivateKey, password)
 	if errors.Is(err, common.AuthError) {
 		return errors.New("invalid password")
 	} else if err != nil {
