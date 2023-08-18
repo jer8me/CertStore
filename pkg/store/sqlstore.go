@@ -31,7 +31,7 @@ func (cs *CertStore) GetCertificate(certificateId int64) (*Certificate, error) {
 		"FROM Certificate WHERE id = ?", certificateId).Scan(&cert.PublicKey, &publicKeyAlgorithmId,
 		&cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter,
 		&cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent, &cert.PrivateKeyId)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("invalid certificate ID: %d", certificateId)
 	}
 	if err != nil {
@@ -121,7 +121,7 @@ func (cs *CertStore) StoreCertificate(cert *Certificate, linkCert bool) (int64, 
 		// Found matching certificate: return id
 		rollback(tx)
 		return certificateId, nil
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		rollback(tx)
 		return 0, fmt.Errorf("failed to query certificate by SHA-256 fingerprint: %w", err)
 	}
@@ -130,7 +130,7 @@ func (cs *CertStore) StoreCertificate(cert *Certificate, linkCert bool) (int64, 
 	if linkCert {
 		// Check if this certificate corresponds to a known private key
 		err = tx.QueryRow("SELECT id FROM PrivateKey WHERE sha256Fingerprint = ?", sha256PublicKey).Scan(&privateKeyId)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			privateKeyId.Valid = false
 		} else if err != nil {
 			// Query error
@@ -160,7 +160,7 @@ func (cs *CertStore) StoreCertificate(cert *Certificate, linkCert bool) (int64, 
 		// Lookup key usage
 		var keyUsageId int
 		err = tx.QueryRow("SELECT id FROM KeyUsage WHERE name = ?", keyUsage).Scan(&keyUsageId)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			rollback(tx)
 			return 0, fmt.Errorf("invalid key usage: %s", keyUsage)
 		}
@@ -291,7 +291,7 @@ func (cs *CertStore) GetCertificatePrivateKeyId(certificateId int64) (int64, err
 	var privateKeyId sql.NullInt64
 	// Fetch Certificate object
 	err := cs.db.QueryRow("SELECT privateKey_id FROM Certificate WHERE id = ?", certificateId).Scan(&privateKeyId)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("invalid certificate ID: %d", certificateId)
 	}
 	if err != nil {
@@ -310,7 +310,7 @@ func (cs *CertStore) GetPrivateKey(privateKeyId int64) (*PrivateKey, error) {
 	err := cs.db.QueryRow("SELECT pk.encryptedPkcs8, pkt.type, pk.pemType, pk.dataEncryptionKey, pk.SHA256Fingerprint FROM PrivateKey pk "+
 		"INNER JOIN PrivateKeyType pkt ON pk.privateKeyType_id = pkt.id WHERE pk.id = ?", privateKeyId).Scan(&privateKey.EncryptedPKCS8,
 		&privateKey.Type, &privateKey.PEMType, &privateKey.DataEncryptionKey, &privateKey.SHA256Fingerprint)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
 	}
 	if err != nil {
@@ -343,7 +343,7 @@ func (cs *CertStore) StorePrivateKey(privateKey *PrivateKey, linkCert bool) (int
 		// Found matching private key: return id
 		rollback(tx)
 		return privateKeyId, nil
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		rollback(tx)
 		return 0, fmt.Errorf("failed to query private key by SHA-256 fingerprint: %w", err)
 	}
@@ -407,7 +407,7 @@ func (cs *CertStore) GetX509Certificate(certificateId int64) (*x509.Certificate,
 	var der []byte
 	// Fetch raw certificate
 	err := cs.db.QueryRow("SELECT rawContent FROM Certificate WHERE id = ?", certificateId).Scan(&der)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("GetX509Certificate: invalid certificate ID: %d", certificateId)
 	}
 	if err != nil {
@@ -542,7 +542,7 @@ func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
 func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error) {
 	var id int
 	err := db.QueryRow("SELECT id FROM PublicKeyAlgorithm WHERE name = ?", publicKeyAlgorithm).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("invalid public key algorithm name: %s", publicKeyAlgorithm)
 	}
 	if err != nil {
@@ -556,7 +556,7 @@ func GetPublicKeyAlgorithmId(db *sql.DB, publicKeyAlgorithm string) (int, error)
 func GetPublicKeyAlgorithmName(db *sql.DB, publicKeyAlgorithmId int) (string, error) {
 	var name string
 	err := db.QueryRow("SELECT name FROM PublicKeyAlgorithm WHERE id = ?", publicKeyAlgorithmId).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("invalid public key algorithm ID: %d", publicKeyAlgorithmId)
 	}
 	if err != nil {
@@ -570,7 +570,7 @@ func GetPublicKeyAlgorithmName(db *sql.DB, publicKeyAlgorithmId int) (string, er
 func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error) {
 	var id int
 	err := db.QueryRow("SELECT id FROM SignatureAlgorithm WHERE name = ?", signatureAlgorithm).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("invalid signature algorithm name: %s", signatureAlgorithm)
 	}
 	if err != nil {
@@ -584,7 +584,7 @@ func GetSignatureAlgorithmId(db *sql.DB, signatureAlgorithm string) (int, error)
 func GetSignatureAlgorithmName(db *sql.DB, signatureAlgorithmId int) (string, error) {
 	var name string
 	err := db.QueryRow("SELECT name FROM SignatureAlgorithm WHERE id = ?", signatureAlgorithmId).Scan(&name)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("invalid signature algorithm ID: %d", signatureAlgorithmId)
 	}
 	if err != nil {
@@ -598,7 +598,7 @@ func GetSignatureAlgorithmName(db *sql.DB, signatureAlgorithmId int) (string, er
 func GetPrivateKeyTypeId(db *sql.DB, privateKeyType string) (int, error) {
 	var id int
 	err := db.QueryRow("SELECT id FROM PrivateKeyType WHERE type = ?", privateKeyType).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("invalid private key type name: %s", privateKeyType)
 	}
 	if err != nil {
