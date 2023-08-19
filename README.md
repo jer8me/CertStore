@@ -31,6 +31,129 @@ go build ./cmd/certstore
 go test ./...
 ```
 
+## Getting Started
+
+The following steps should be executed from the openssl directory.
+```bash
+cd openssl
+```
+
+### Self-signed certificate with RSA
+
+Generate RSA private key
+```bash
+openssl genrsa -out rsa4096.key 4096
+```
+
+Generate certificate
+```bash
+openssl req -new -x509 -key rsa4096.key -days 365 -config certstore.cnf -out rsa4096.crt
+```
+
+Save the certificate and private key in CertStore
+```bash
+certstore store rsa4096.key rsa4096.crt -p $PASSWORD
+```
+
+Check that the certificate and the private key are stored
+```bash
+certstore list
+certstore show 1
+```
+
+Retrieve the certificate and the private key when needed
+```bash
+certstore save 1 -c rsa4096out.crt -k rsa4096out.key -p $PASSWORD
+```
+
+### Self-signed certificate with Ed25519
+
+Generate Ed25519 private key
+```bash
+openssl genpkey -algorithm ED25519 -out ed25519.key
+```
+
+Generate certificate
+```bash
+openssl req -new -x509 -key ed25519.key -days 365 -config certstore.cnf -out ed25519.crt
+```
+
+Save the certificate and private key in CertStore
+```bash
+certstore store ed25519.key ed25519.crt -p $PASSWORD
+```
+
+Check that the certificate and the private key are stored
+```bash
+certstore list
+certstore show 2
+```
+
+Retrieve the certificate and the private key when needed
+```bash
+certstore save 2 -c ed25519out.crt -k ed25519out.key -p $PASSWORD
+```
+
+### Self-signed certificate with Elliptic-curve
+
+Generate Elliptic-curve private key
+```bash
+openssl ecparam -name secp521r1 -genkey -noout -out ecdsa521.key
+```
+
+Generate certificate
+```bash
+openssl req -new -x509 -key ecdsa521.key -days 365 -config certstore.cnf -out ecdsa521.crt
+```
+
+Save the certificate and private key in CertStore
+```bash
+certstore store ecdsa521.key ecdsa521.crt -p $PASSWORD
+```
+
+Check that the certificate and the private key are stored
+```bash
+certstore list
+certstore show 3
+```
+
+Retrieve the certificate and the private key when needed
+```bash
+certstore save 3 -c ecdsa521out.crt -k ecdsa521out.key -p $PASSWORD
+```
+
+### Self-signed certificate with DSA
+
+> [!WARNING]
+> DSA is not a secure algorithm and should not be used. The following example is given for testing purpose only.
+
+Generate DSA private key
+```bash
+openssl dsaparam -out dsaparam.pem 2048
+openssl gendsa -out dsa2048.key dsaparam.pem
+```
+
+Generate certificate
+```bash
+openssl req -new -x509 -key dsa2048.key -days 365 -config certstore.cnf -out dsa2048.crt
+```
+
+Save the certificate and private key in CertStore
+```bash
+certstore store dsa2048.crt
+```
+
+Check that the certificate and the private key are stored
+```bash
+certstore list
+certstore show 4
+```
+
+Retrieve the certificate and the private key when needed
+```bash
+certstore save 4 -c dsa2048out.crt
+```
+
 ## Using CertStore
 
 ### List stored certificates
