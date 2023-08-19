@@ -18,7 +18,7 @@ import (
 
 // Helper function to return the path of a certificate file
 func certPath(filename string) string {
-	return path.Join("../certificates/testdata", filename)
+	return path.Join("../../testdata", filename)
 }
 
 // Helper function to parse a URL. If the URL is invalid, it immediately fails the test

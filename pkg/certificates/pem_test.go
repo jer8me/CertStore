@@ -28,7 +28,7 @@ func TestParsePEMFile(t *testing.T) {
 	}{
 		{
 			"TestRSACertificate",
-			"testdata/champlain.crt",
+			"champlain.crt",
 			&certificate{
 				"RSA",
 				3,
@@ -41,7 +41,7 @@ func TestParsePEMFile(t *testing.T) {
 		},
 		{
 			"TestECDSACertificate",
-			"testdata/github.crt",
+			"github.crt",
 			&certificate{
 				"ECDSA",
 				3,
@@ -54,7 +54,7 @@ func TestParsePEMFile(t *testing.T) {
 		},
 		{
 			"TestEd25519Certificate",
-			"testdata/ed25519.crt",
+			"ed25519.crt",
 			&certificate{
 				"Ed25519",
 				3,
@@ -67,7 +67,7 @@ func TestParsePEMFile(t *testing.T) {
 		},
 		{
 			"TestDSACertificate",
-			"testdata/dsa.crt",
+			"dsa.crt",
 			&certificate{
 				"DSA",
 				3,
@@ -81,7 +81,8 @@ func TestParsePEMFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			certs, privateKeys, err := ParsePEMFile(tt.filename)
+			filename := path.Join("../../testdata", tt.filename)
+			certs, privateKeys, err := ParsePEMFile(filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParsePEMFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -107,34 +108,35 @@ func TestWriteCertificate(t *testing.T) {
 	}{
 		{
 			"TestRSACertificate",
-			"testdata/champlain.crt",
+			"champlain.crt",
 			assert.NoError,
 		},
 		{
 			"TestECDSACertificate",
-			"testdata/github.crt",
+			"github.crt",
 			assert.NoError,
 		},
 		{
 			"TestEd25519Certificate",
-			"testdata/ed25519.crt",
+			"ed25519.crt",
 			assert.NoError,
 		},
 		{
 			"TestDSACertificate",
-			"testdata/dsa.crt",
+			"dsa.crt",
 			assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			certs, privateKeys, err := ParsePEMFile(tt.filename)
+			filename := path.Join("../../testdata", tt.filename)
+			certs, privateKeys, err := ParsePEMFile(filename)
 			require.NoError(t, err, "failed to parse certificate")
 			assert.Nil(t, privateKeys, "unexpected private key found")
 			assert.Len(t, certs, 1, "expected exactly one certificate")
 			outfile := path.Join(t.TempDir(), path.Base(tt.filename))
 			tt.wantErr(t, WriteCertificate(outfile, certs[0]), fmt.Sprintf("WritePEMFile(%v)", tt.filename))
-			expected, err := os.ReadFile(tt.filename)
+			expected, err := os.ReadFile(filename)
 			require.NoError(t, err, "failed to read original certificate")
 			actual, err := os.ReadFile(outfile)
 			require.NoError(t, err, "failed to read original certificate")
