@@ -50,7 +50,7 @@ Generate certificate
 openssl req -new -x509 -key rsa4096.key -days 365 -config certstore.cnf -out rsa4096.crt
 ```
 
-Save the certificate and private key in CertStore
+Store the certificate and private key in CertStore
 ```bash
 certstore store rsa4096.key rsa4096.crt -p $PASSWORD
 ```
@@ -61,7 +61,7 @@ certstore list
 certstore show 1
 ```
 
-Retrieve the certificate and the private key when needed
+Retrieve the certificate and the private key
 ```bash
 certstore save 1 -c rsa4096out.crt -k rsa4096out.key -p $PASSWORD
 ```
@@ -78,7 +78,7 @@ Generate certificate
 openssl req -new -x509 -key ed25519.key -days 365 -config certstore.cnf -out ed25519.crt
 ```
 
-Save the certificate and private key in CertStore
+Store the certificate and private key in CertStore
 ```bash
 certstore store ed25519.key ed25519.crt -p $PASSWORD
 ```
@@ -89,7 +89,7 @@ certstore list
 certstore show 2
 ```
 
-Retrieve the certificate and the private key when needed
+Retrieve the certificate and the private key
 ```bash
 certstore save 2 -c ed25519out.crt -k ed25519out.key -p $PASSWORD
 ```
@@ -106,7 +106,7 @@ Generate certificate
 openssl req -new -x509 -key ecdsa521.key -days 365 -config certstore.cnf -out ecdsa521.crt
 ```
 
-Save the certificate and private key in CertStore
+Store the certificate and private key in CertStore
 ```bash
 certstore store ecdsa521.key ecdsa521.crt -p $PASSWORD
 ```
@@ -117,7 +117,7 @@ certstore list
 certstore show 3
 ```
 
-Retrieve the certificate and the private key when needed
+Retrieve the certificate and the private key
 ```bash
 certstore save 3 -c ecdsa521out.crt -k ecdsa521out.key -p $PASSWORD
 ```
@@ -138,7 +138,7 @@ Generate certificate
 openssl req -new -x509 -key dsa2048.key -days 365 -config certstore.cnf -out dsa2048.crt
 ```
 
-Save the certificate and private key in CertStore
+Store the certificate and private key in CertStore
 ```bash
 certstore store dsa2048.crt
 ```
@@ -149,12 +149,49 @@ certstore list
 certstore show 4
 ```
 
-Retrieve the certificate and the private key when needed
+Retrieve the certificate and the private key
 ```bash
 certstore save 4 -c dsa2048out.crt
 ```
 
-## Using CertStore
+### Certificate signed by self-signed CA
+
+Create a Root CA
+```bash
+openssl genrsa -out rootca.key 4096
+openssl req -new -x509 -key rootca.key -days 3650 -config rootca.cnf -out rootca.crt
+```
+
+Store the Root CA certificate and private key in CertStore
+```bash
+certstore store rootca.key rootca.crt -p $PASSWORD
+```
+
+Create an End-Entity certificate signed by the Root CA
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out endentity.key
+openssl req -new -out endentity.csr -key endentity.key -config certstore.cnf
+openssl x509 -req -days 365 -in endentity.csr -extfile certstore.cnf -extensions req_ext -CA rootca.crt -CAkey rootca.key -CAcreateserial -out endentity.crt
+```
+
+Store the End-Entity certificate and private key in CertStore
+```bash
+certstore store endentity.key endentity.crt -p $PASSWORD
+```
+
+Check that the certificates and the private keys are stored
+```bash
+certstore list
+certstore show 5
+certstore show 6
+```
+
+Retrieve the End-Entity certificate and the private key
+```bash
+certstore save 6 -c endentityout.crt -k endentityout.key -p $PASSWORD
+```
+
+## Usage
 
 ### List stored certificates
 

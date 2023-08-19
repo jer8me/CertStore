@@ -9,7 +9,7 @@ O = CertStore
 C = US
 [req_ext]
 authorityKeyIdentifier = keyid,issuer
-basicConstraints = critical,CA:false,pathlen:0
-keyUsage = digitalSignature,keyEncipherment,dataEncipherment
-extendedKeyUsage = serverAuth
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth,clientAuth
 subjectAltName = DNS:certstore.io

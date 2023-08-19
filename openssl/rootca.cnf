@@ -1,0 +1,13 @@
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = req_ext
+prompt = no
+utf8 = yes
+[req_distinguished_name]
+CN = Jerome Root CA
+O = CertStore
+C = US
+[req_ext]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,digitalSignature,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
