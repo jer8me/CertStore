@@ -48,6 +48,12 @@ func rollback(tx *sql.Tx) {
 	}
 }
 
+func closeRows(rows *sql.Rows) {
+	if err := rows.Close(); err != nil {
+		log.Fatalf("failed to close rows: %s\n", err)
+	}
+}
+
 // InitDatabase checks that the database is initialized as expected
 // and performs the initialization as needed.
 func InitDatabase(db *sql.DB) error {

@@ -263,7 +263,7 @@ func (cs *CertStore) GetCertificates(searchFilters *SearchFilter) ([]*Certificat
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// A map of string slices to hold data from returned rows.
 	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
@@ -510,7 +510,7 @@ func FindCertificateByPublicKey(tx *sql.Tx, publicKey []byte) ([]int64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// Slice of certificate IDs matching this private key's public key
 	var certificateIds []int64
@@ -617,7 +617,7 @@ func GetCertificateKeyUsages(db *sql.DB, certificateId int64) ([]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// A slice of strings to hold data from returned rows.
 	var keyUsages []string
@@ -645,7 +645,7 @@ func GetSANTypes(db *sql.DB) ([]SANType, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// A SANType slice to hold data from returned rows.
 	var sanTypes []SANType
@@ -677,7 +677,7 @@ func GetCertificateSANs(db *sql.DB, certificateId int64) (map[string][]string, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// A map of string slices to hold data from returned rows.
 	// The key of the map is the type of the SAN (DNSName, EmailAddress, URI...).
@@ -706,7 +706,7 @@ func GetAttributeTypes(db *sql.DB) ([]AttributeType, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// An AttributeType slice to hold data from returned rows.
 	var attributeTypes []AttributeType
@@ -736,7 +736,7 @@ func GetCertificateAttributes(db *sql.DB, certificateId int64, attributeType str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer closeRows(rows)
 
 	// An Attribute slice to hold data from returned rows.
 	var attributes []Attribute
