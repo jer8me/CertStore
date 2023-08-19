@@ -32,7 +32,7 @@ func (cs *CertStore) GetCertificate(certificateId int64) (*Certificate, error) {
 		&cert.Version, &cert.SerialNumber, &cert.SubjectCN, &cert.IssuerCN, &cert.NotBefore, &cert.NotAfter,
 		&cert.Signature, &signatureAlgorithmId, &cert.IsCA, &cert.RawContent, &cert.PrivateKeyId)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("certificate ID %d does not exist", certificateId)
+		return nil, fmt.Errorf("certificate ID %d not found", certificateId)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
@@ -292,7 +292,7 @@ func (cs *CertStore) GetCertificatePrivateKeyId(certificateId int64) (int64, err
 	// Fetch Certificate object
 	err := cs.db.QueryRow("SELECT privateKey_id FROM Certificate WHERE id = ?", certificateId).Scan(&privateKeyId)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("invalid certificate ID: %d", certificateId)
+		return 0, fmt.Errorf("certificate ID %d not found", certificateId)
 	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to query certificate ID %d: %w", certificateId, err)
@@ -311,7 +311,7 @@ func (cs *CertStore) GetPrivateKey(privateKeyId int64) (*PrivateKey, error) {
 		"INNER JOIN PrivateKeyType pkt ON pk.privateKeyType_id = pkt.id WHERE pk.id = ?", privateKeyId).Scan(&privateKey.EncryptedPKCS8,
 		&privateKey.Type, &privateKey.PEMType, &privateKey.DataEncryptionKey, &privateKey.SHA256Fingerprint)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("invalid private key ID: %d", privateKeyId)
+		return nil, fmt.Errorf("private key ID %d not found", privateKeyId)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query private key ID %d: %w", privateKeyId, err)
