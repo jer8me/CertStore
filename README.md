@@ -8,7 +8,7 @@ To build the project, a few prerequisites must be installed on your machine.
 
 ### Golang
 
-CertStore is written is Golang and requires the Go tool chain to be built.
+CertStore is written in Golang and requires the Go toolchain to be built.
 The instructions to install Go can be found on the Go website: https://go.dev/doc/install
 
 ### GCC
@@ -125,7 +125,7 @@ certstore save 3 -c ecdsa521out.crt -k ecdsa521out.key -p $PASSWORD
 ### Self-signed certificate with DSA
 
 > [!WARNING]
-> DSA is not a secure algorithm and should not be used. The following example is given for testing purpose only.
+> DSA is not a secure algorithm and should not be used. The following example is given for testing purposes only.
 
 Generate DSA private key
 ```bash
