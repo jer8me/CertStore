@@ -30,7 +30,7 @@ func OpenDatabase(filepath string) (*sql.DB, error) {
 	}
 	dir, _ := path.Split(filepath)
 	if dir != "" {
-		err = os.MkdirAll(dir, 0600)
+		err = os.MkdirAll(dir, 0700)
 		if err != nil {
 			return nil, err
 		}
