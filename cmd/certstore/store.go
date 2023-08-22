@@ -24,7 +24,7 @@ func newStoreCommand(cs CertStore) *cobra.Command {
 				// Read PEM file
 				c, pk, err := certificates.ParsePEMFile(filepath)
 				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "failed to read file %s: %v\n", filepath, err)
+					_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					continue
 				}
 				certs = append(certs, c...)
