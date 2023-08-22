@@ -16,7 +16,7 @@ import (
 
 // Helper function to open a database connection
 func openDB(t *testing.T) *sql.DB {
-	dbpath := path.Join(t.TempDir(), "test.db")
+	dbpath := path.Join(t.TempDir(), ".certstore", "test.db")
 	// Connect to database
 	db, err := store.OpenDatabase(dbpath)
 	require.NoError(t, err, "failed to open database '%s'", dbpath)
