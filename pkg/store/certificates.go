@@ -229,25 +229,35 @@ func GetAttributes(dn pkix.Name) []Attribute {
 	return attributes
 }
 
-var keyUsageNames = map[x509.KeyUsage]string{
-	x509.KeyUsageDigitalSignature:  "DigitalSignature",
-	x509.KeyUsageContentCommitment: "ContentCommitment",
-	x509.KeyUsageKeyEncipherment:   "KeyEncipherment",
-	x509.KeyUsageDataEncipherment:  "DataEncipherment",
-	x509.KeyUsageKeyAgreement:      "KeyAgreement",
-	x509.KeyUsageCertSign:          "KeyCertSign",
-	x509.KeyUsageCRLSign:           "CRLSign",
-	x509.KeyUsageEncipherOnly:      "EncipherOnly",
-	x509.KeyUsageDecipherOnly:      "DecipherOnly",
-}
-
 // GetKeyUsages returns a slice of strings representing the key usages included in the certificate
 func GetKeyUsages(x509certificate *x509.Certificate) []string {
 	var keyUsages []string
-	for ku, name := range keyUsageNames {
-		if (x509certificate.KeyUsage & ku) != 0 {
-			keyUsages = append(keyUsages, name)
-		}
+	if (x509certificate.KeyUsage & x509.KeyUsageDigitalSignature) != 0 {
+		keyUsages = append(keyUsages, "DigitalSignature")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageContentCommitment) != 0 {
+		keyUsages = append(keyUsages, "ContentCommitment")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageKeyEncipherment) != 0 {
+		keyUsages = append(keyUsages, "KeyEncipherment")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageDataEncipherment) != 0 {
+		keyUsages = append(keyUsages, "DataEncipherment")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageKeyAgreement) != 0 {
+		keyUsages = append(keyUsages, "KeyAgreement")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageCertSign) != 0 {
+		keyUsages = append(keyUsages, "KeyCertSign")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageCRLSign) != 0 {
+		keyUsages = append(keyUsages, "CRLSign")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageEncipherOnly) != 0 {
+		keyUsages = append(keyUsages, "EncipherOnly")
+	}
+	if (x509certificate.KeyUsage & x509.KeyUsageDecipherOnly) != 0 {
+		keyUsages = append(keyUsages, "DecipherOnly")
 	}
 	return keyUsages
 }
