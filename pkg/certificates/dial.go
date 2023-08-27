@@ -3,8 +3,8 @@ package certificates
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"golang.org/x/exp/slices"
 	"net"
+	"slices"
 	"time"
 )
 
